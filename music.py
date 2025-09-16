@@ -22,9 +22,9 @@ RPCDefault = {
     "details": "Terra's Music Player",
     "state": "Idle",
     "start": int(time.time()),
-    "large_image": "logo.png",
+    "large_image": "resources/logo.png",
     "large_text": "Terra's Music Player",
-    "small_image": "logo.png",
+    "small_image": "resources/logo.png",
     "small_text": "Terra's Music Player"
 }
 
@@ -149,9 +149,9 @@ class MusicPlayer:
                 "details": get_random_flavor_message(),
                 "state": "Listening to " + self.current_title,
                 "start": int(time.time()),
-                "large_image": "logo.png",
+                "large_image": "resources/logo.png",
                 "large_text": "Terra's Music Player",
-                "small_image": "logo.png",
+                "small_image": "resources/logo.png",
                 "small_text": "Terra's Music Player"
             }
         except Exception as e:
