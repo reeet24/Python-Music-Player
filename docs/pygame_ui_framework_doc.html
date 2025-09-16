@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Pygame UI Framework</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h1 id="pygame-ui-framework">Pygame UI Framework</h1>
+<p>A lightweight, JSON-styled wrapper for building widget-based UIs in <code>pygame</code>.</p>
+<p>This framework provides:</p>
+<ul>
+<li><strong>Widget base class</strong> for reusable UI components</li>
+<li><strong>JSON-driven styling</strong> for flexible skinning</li>
+<li><strong>UIManager</strong> for centralized event handling &amp; rendering</li>
+<li><strong>Extensible architecture</strong> (add new widgets by subclassing <code>Widget</code>)</li>
+<li><strong>Built-in widgets</strong>: Button, Label, TextBox, Slider</li>
+</ul>
+<hr>
+<h2 id="installation">Installation</h2>
+<p>Clone or copy <code>ui_framework.py</code> into your project and ensure <code>pygame</code> is installed:</p>
+<pre><code class="language-bash">pip install pygame
+</code></pre>
+<hr>
+<h2 id="basic-usage">Basic Usage</h2>
+<h3 id="1-create-a-style-json">1. Create a Style JSON</h3>
+<p><code>styles.json</code> defines widget appearance by <strong>type</strong> and <strong>state</strong>:</p>
+<pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;Button&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;default&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;bg_color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">180</span><span class="hljs-punctuation">,</span> <span class="hljs-number">180</span><span class="hljs-punctuation">,</span> <span class="hljs-number">180</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;fg_color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">0</span><span class="hljs-punctuation">,</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span> <span class="hljs-number">0</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;font_size&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">24</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;hover&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;bg_color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">200</span><span class="hljs-punctuation">,</span> <span class="hljs-number">200</span><span class="hljs-punctuation">,</span> <span class="hljs-number">250</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;pressed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;bg_color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">100</span><span class="hljs-punctuation">,</span> <span class="hljs-number">100</span><span class="hljs-punctuation">,</span> <span class="hljs-number">200</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;Label&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;default&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;fg_color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">255</span><span class="hljs-punctuation">,</span> <span class="hljs-number">255</span><span class="hljs-punctuation">,</span> <span class="hljs-number">255</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;font_size&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">20</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;TextBox&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;default&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;bg_color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">255</span><span class="hljs-punctuation">,</span> <span class="hljs-number">255</span><span class="hljs-punctuation">,</span> <span class="hljs-number">255</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;fg_color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">0</span><span class="hljs-punctuation">,</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span> <span class="hljs-number">0</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;font_size&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">22</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;Slider&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;default&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;track_color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">200</span><span class="hljs-punctuation">,</span> <span class="hljs-number">200</span><span class="hljs-punctuation">,</span> <span class="hljs-number">200</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;knob_color&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-number">80</span><span class="hljs-punctuation">,</span> <span class="hljs-number">80</span><span class="hljs-punctuation">,</span> <span class="hljs-number">200</span><span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<h3 id="2-initialize-the-framework">2. Initialize the Framework</h3>
+<pre><code class="language-python"><span class="hljs-keyword">import</span> pygame
+<span class="hljs-keyword">from</span> ui_framework <span class="hljs-keyword">import</span> UIManager, Button, Label, TextBox, Slider, StyleManager
+
+pygame.init()
+screen = pygame.display.set_mode((<span class="hljs-number">600</span>, <span class="hljs-number">400</span>))
+clock = pygame.time.Clock()
+
+styles = StyleManager(<span class="hljs-string">&quot;styles.json&quot;</span>)
+ui = UIManager()
+</code></pre>
+<h3 id="3-create-widgets">3. Create Widgets</h3>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">on_click</span>():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Button clicked!&quot;</span>)
+
+btn = Button(
+    rect=(<span class="hljs-number">200</span>, <span class="hljs-number">50</span>, <span class="hljs-number">200</span>, <span class="hljs-number">60</span>), 
+    style=styles.get_style(<span class="hljs-string">&quot;Button&quot;</span>), 
+    text=<span class="hljs-string">&quot;Click Me&quot;</span>, 
+    callback=on_click
+)
+ui.add(btn)
+
+label = Label(
+    rect=(<span class="hljs-number">200</span>, <span class="hljs-number">120</span>, <span class="hljs-number">200</span>, <span class="hljs-number">40</span>),
+    style=styles.get_style(<span class="hljs-string">&quot;Label&quot;</span>),
+    text=<span class="hljs-string">&quot;Hello, World!&quot;</span>
+)
+ui.add(label)
+
+textbox = TextBox(
+    rect=(<span class="hljs-number">200</span>, <span class="hljs-number">170</span>, <span class="hljs-number">200</span>, <span class="hljs-number">40</span>),
+    style=styles.get_style(<span class="hljs-string">&quot;TextBox&quot;</span>)
+)
+ui.add(textbox)
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">on_slide</span>(<span class="hljs-params">value</span>):
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Slider value:&quot;</span>, <span class="hljs-built_in">int</span>(value))
+
+slider = Slider(
+    rect=(<span class="hljs-number">200</span>, <span class="hljs-number">230</span>, <span class="hljs-number">200</span>, <span class="hljs-number">20</span>),
+    style=styles.get_style(<span class="hljs-string">&quot;Slider&quot;</span>),
+    min_val=<span class="hljs-number">0</span>, max_val=<span class="hljs-number">100</span>, start_val=<span class="hljs-number">50</span>,
+    callback=on_slide
+)
+ui.add(slider)
+</code></pre>
+<h3 id="4-main-loop">4. Main Loop</h3>
+<pre><code class="language-python">running = <span class="hljs-literal">True</span>
+<span class="hljs-keyword">while</span> running:
+    <span class="hljs-keyword">for</span> event <span class="hljs-keyword">in</span> pygame.event.get():
+        <span class="hljs-keyword">if</span> event.<span class="hljs-built_in">type</span> == pygame.QUIT:
+            running = <span class="hljs-literal">False</span>
+        ui.handle_event(event)
+
+    screen.fill((<span class="hljs-number">30</span>, <span class="hljs-number">30</span>, <span class="hljs-number">30</span>))
+    ui.draw(screen)
+    pygame.display.flip()
+    clock.tick(<span class="hljs-number">60</span>)
+
+pygame.quit()
+</code></pre>
+<hr>
+<h2 id="api-reference">API Reference</h2>
+<h3 id="stylemanagerstyle_file-str"><code>StyleManager(style_file: str)</code></h3>
+<p>Loads and manages styles from a JSON file.</p>
+<ul>
+<li><code>get_style(widget_type: str, state=&quot;default&quot;) -&gt; dict</code><br>
+Returns a dictionary of style attributes for the given widget type and state.</li>
+</ul>
+<hr>
+<h3 id="widget"><code>Widget</code></h3>
+<p>Base class for all widgets.</p>
+<p><strong>Attributes</strong>:</p>
+<ul>
+<li><code>rect</code> – <code>pygame.Rect</code> bounding box</li>
+<li><code>style</code> – dictionary of visual properties</li>
+<li><code>state</code> – <code>&quot;default&quot; | &quot;hover&quot; | &quot;pressed&quot;</code> (custom states allowed)</li>
+<li><code>visible</code> – whether to draw the widget</li>
+</ul>
+<p><strong>Methods</strong>:</p>
+<ul>
+<li><code>apply_style(style: dict)</code> – update style dynamically</li>
+<li><code>handle_event(event)</code> – process <code>pygame</code> events</li>
+<li><code>draw(surface)</code> – render widget</li>
+</ul>
+<hr>
+<h3 id="buttonwidget"><code>Button(Widget)</code></h3>
+<p>Clickable button with hover and press states.</p>
+<p><strong>Extra attributes</strong>:</p>
+<ul>
+<li><code>text</code> – label string</li>
+<li><code>callback</code> – function called when pressed</li>
+</ul>
+<hr>
+<h3 id="labelwidget"><code>Label(Widget)</code></h3>
+<p>Simple non-interactive text label.</p>
+<p><strong>Extra attributes</strong>:</p>
+<ul>
+<li><code>text</code> – displayed string</li>
+</ul>
+<p><strong>JSON keys</strong>:</p>
+<ul>
+<li><code>fg_color</code> → text color</li>
+<li><code>font_size</code> → font size</li>
+</ul>
+<hr>
+<h3 id="textboxwidget"><code>TextBox(Widget)</code></h3>
+<p>Editable text input field with blinking cursor.</p>
+<p><strong>Extra attributes</strong>:</p>
+<ul>
+<li><code>text</code> – current content</li>
+<li><code>active</code> – focused state</li>
+</ul>
+<p><strong>JSON keys</strong>:</p>
+<ul>
+<li><code>bg_color</code> → background color</li>
+<li><code>fg_color</code> → text color</li>
+<li><code>font_size</code> → font size</li>
+</ul>
+<hr>
+<h3 id="sliderwidget"><code>Slider(Widget)</code></h3>
+<p>Adjustable value widget with draggable knob.</p>
+<p><strong>Extra attributes</strong>:</p>
+<ul>
+<li><code>min_val</code> / <code>max_val</code> – numeric range</li>
+<li><code>value</code> – current value</li>
+<li><code>callback</code> – function called on value change</li>
+</ul>
+<p><strong>JSON keys</strong>:</p>
+<ul>
+<li><code>track_color</code> → slider background</li>
+<li><code>knob_color</code> → draggable knob color</li>
+</ul>
+<hr>
+<h3 id="uimanager"><code>UIManager</code></h3>
+<p>Central controller for widgets.</p>
+<p><strong>Methods</strong>:</p>
+<ul>
+<li><code>add(widget)</code> – register a widget</li>
+<li><code>handle_event(event)</code> – forward events to widgets</li>
+<li><code>draw(surface)</code> – draw all widgets</li>
+</ul>
+<hr>
+<h2 id="extending-the-framework">Extending the Framework</h2>
+<p>To add custom widgets (checkboxes, dropdowns, etc.):</p>
+<ol>
+<li>Subclass <code>Widget</code></li>
+<li>Implement <code>handle_event</code> and <code>draw</code></li>
+<li>Add style keys in JSON</li>
+</ol>
+<hr>
+<h2 id="roadmap--possible-extensions">Roadmap / Possible Extensions</h2>
+<ul>
+<li>Text input validation &amp; multiline text areas</li>
+<li>Checkboxes &amp; toggles</li>
+<li>Sliders (vertical, ranged)</li>
+<li>Layout managers (grid, vertical, horizontal)</li>
+<li>Nested containers for grouping widgets</li>
+</ul>
+<hr>
+<h2 id="license">License</h2>
+<p>Free to use and modify for any purpose.</p>
+
+            
+            
+        </body>
+        </html>
