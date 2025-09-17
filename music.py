@@ -5,9 +5,10 @@ import threading
 import queue
 import time
 import traceback
+from typing import Any
 import yt_dlp
 import pygame
-from utils.ui_framework import UIManager, Button, Label, TextBox, Slider, StyleManager
+from utils.ui_framework import UIManager, Button, Label, TextBox, Slider, StyleManager, Widget, Container
 import pypresence
 import random
 from mutagen.mp3 import MP3
@@ -62,6 +63,13 @@ def get_random_flavor_message():
         data = json.load(f)
     return data["flavors"][random.randint(0, len(data["flavors"]) - 1)]
 
+def get_playlists() -> dict[str, Any]:
+    playlists = {}
+    for playlist in os.listdir(PLAYLIST_DIR):
+        with open(os.path.join(PLAYLIST_DIR, playlist), "r", encoding="utf-8") as f:
+            playlists[playlist[:-5]] = json.load(f)
+    return playlists
+
 # ---- Music backend ----
 class MusicPlayer:
     def __init__(self, ui_queue):
@@ -86,11 +94,10 @@ class MusicPlayer:
             "noplaylist": True,
             "nopart": True,
             "geo_bypass": True,  # optional: bypass some region restrictions
-            "cookies": "cookies.json",
-            "rm-cache-dir": True
+            "cookies-from-browser": "chrome",
         }
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl: # type: ignore
                 info = ydl.extract_info(url, download=True)
                 # prepare_filename gives the file name used by outtmpl (before postprocessing ext change)
                 filename = ydl.prepare_filename(info)
@@ -303,6 +310,87 @@ class PlaylistWidget:
                         self.debounce = False
                     threading.Thread(target=delayed).start()
 
+class SearchBoxWidget(Widget):
+    def __init__(self, rect, style, font, item_height: int, items: dict[str, Any]):
+        super().__init__(rect, style)
+        self.font = font
+        self.items = items
+        self.query = ""
+        self.selected = -1
+        self.item_height = item_height
+        self.active = False
+        self.search_rect = pygame.Rect(self.rect.x + 4, self.rect.y + 4, self.rect.w, item_height)
+
+    def draw(self, surf):
+        # Draw first item as search box, then draw all other items
+        bg = tuple(self.style.get("bg_color", (30, 30, 30)))
+        fg = tuple(self.style.get("fg_color", (230, 230, 230)))
+        sel_bg = tuple(self.style.get("selected_bg", (80, 80, 120)))
+        pygame.draw.rect(surf, bg, self.rect)
+        # clip drawing to widget rect
+        clip = surf.get_clip()
+        surf.set_clip(self.rect)
+        x, y = self.rect.x + 4, self.rect.y + 4
+
+        # search box
+        txtsurf = self.font.render(self.query or "Search", True, fg)
+        surf.blit(txtsurf, (x, y))
+        y += self.item_height
+
+        for i, (text, item) in enumerate(self.items.items()):
+            item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
+            if i == self.selected:
+                pygame.draw.rect(surf, sel_bg, item_rect)
+
+            txtsurf = self.font.render(text, True, fg)
+            surf.blit(txtsurf, (x, y))
+            y += self.item_height
+        surf.set_clip(clip)
+        # border
+        pygame.draw.rect(surf, (0,0,0), self.rect, 2)
+
+    def handle_event(self, event):
+
+        if event.type == pygame.KEYDOWN:
+
+            if not self.active:
+                return
+
+            if event.key == pygame.K_BACKSPACE:
+                self.query = self.query[:-1]
+            elif event.key == pygame.K_RETURN:
+                if self.selected >= 0:
+                    self.active = False
+                    self.query = list(self.items.keys())[self.selected]
+                    self.selected = -1
+                    return
+            elif event.key == pygame.K_ESCAPE:
+                self.active = False
+            elif event.key == pygame.K_DOWN:
+                self.selected = (self.selected + 1) % len(self.items)
+            elif event.key == pygame.K_UP:
+                self.selected = (self.selected - 1) % len(self.items)
+            else:
+                self.query += event.unicode
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+
+            #First check if we clicked on the text box and set active accordingly
+            if self.search_rect.collidepoint(event.pos):
+                self.active = True
+                return
+            else:
+                self.active = False
+
+            local_y = event.pos[1] - self.rect.y
+            idx = self.selected + (local_y // self.item_height)
+            if 0 <= idx < len(self.items):
+                self.selected = idx
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 3:
+            local_y = event.pos[1] - self.rect.y
+            idx = self.selected + (local_y // self.item_height)
+            if 0 <= idx < len(self.items):
+                self.selected = idx
+
 # ---- Main UI assembly ----
 def main():
     screen = pygame.display.set_mode((800, 480))
@@ -363,28 +451,30 @@ def main():
     playlist = PlaylistWidget(rect=(12, 110, 520, 340), style=playlist_style, font=font, player=player)
     ui.add(playlist)
 
-    # Right column controls: playlist save/load
-    name_box = TextBox(rect=(548, 110, 240, 32), style=safe_style_get(style_mgr, "TextBox"))
+    # Replace the name_box with a SearchBoxWidget
+    searchFont = pygame.font.SysFont("Arial", 18)
+    playlists = get_playlists()
+    name_box = SearchBoxWidget(rect=(548, 152, 240, 256), style=safe_style_get(style_mgr, "ListBox"), font=searchFont, item_height=24, items=playlists)
     ui.add(name_box)
 
     def do_save():
-        name = getattr(name_box, "text", "").strip()
+        name = getattr(name_box, "query", "").strip()
         if name:
             player.save_playlist(name)
 
     def do_load():
-        name = getattr(name_box, "text", "").strip()
+        name = getattr(name_box, "query", "").strip()
         if name:
             player.load_playlist(name)
 
-    btn_save = Button(rect=(548, 152, 110, 36), style=safe_style_get(style_mgr, "Button"), text="Save Playlist", callback=do_save)
+    btn_save = Button(rect=(548, 110, 110, 36), style=safe_style_get(style_mgr, "Button"), text="Save Playlist", callback=do_save)
     ui.add(btn_save)
-    btn_load = Button(rect=(678, 152, 110, 36), style=safe_style_get(style_mgr, "Button"), text="Load Playlist", callback=do_load)
+    btn_load = Button(rect=(678, 110, 110, 36), style=safe_style_get(style_mgr, "Button"), text="Load Playlist", callback=do_load)
     ui.add(btn_load)
 
     # Now playing label
     now_label_style = safe_style_get(style_mgr, "Label")
-    now_label = Label(rect=(548, 210, 320, 28), style=now_label_style, text="Now: (stopped)")
+    now_label = Label(rect=(12, 460, 500, 28), style=now_label_style, text="Now: (stopped)")
     ui.add(now_label)
 
     # Small status area
@@ -418,7 +508,8 @@ def main():
                     continue
                 tag = msg[0]
                 if tag == "download_complete":
-                    _, path, title = msg
+                    _, down_entry = msg
+                    title = down_entry["title"]
                     status_text = f"Downloaded: {title}"
                     # refresh playlist widget (it uses player.playlist directly)
                     if hasattr(now_label, "set_text"):
@@ -479,7 +570,7 @@ def main():
             if dur > 0:
                 elapsed = pygame.mixer.music.get_pos() // 1000
                 ratio = min(1.0, elapsed / dur)
-                bar_rect = pygame.Rect(14, 460-40, 516, 10)
+                bar_rect = pygame.Rect(14, 420, 516, 10)
                 pygame.draw.rect(screen, (80,80,80), bar_rect)
                 fill_rect = pygame.Rect(bar_rect.x, bar_rect.y, int(bar_rect.w * ratio), bar_rect.h)
                 pygame.draw.rect(screen, (120,200,120), fill_rect)

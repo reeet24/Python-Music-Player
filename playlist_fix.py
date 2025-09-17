@@ -35,4 +35,6 @@ def update_playlist_durations(path):
 # update_playlist_durations("playlists/my_playlist.json")
 
 if __name__ == "__main__":
-    update_playlist_durations("playlists/Vibes.json")
+    for playlist in os.listdir("playlists"):
+        if playlist.endswith(".json"):
+            update_playlist_durations(os.path.join("playlists", playlist))

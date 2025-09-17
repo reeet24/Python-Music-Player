@@ -162,6 +162,19 @@ class Slider(Widget):
         knob_rect = pygame.Rect(knob_x - 5, self.rect.y, 10, self.rect.height)
         pygame.draw.rect(surface, knob_color, knob_rect)
 
+class Container(Widget):
+    def __init__(self, rect, style, widgets=[]):
+        super().__init__(rect, style)
+        self.widgets = widgets
+        self.surface = pygame.Surface((self.rect.w, self.rect.h))
+
+    def handle_event(self, event):
+        for w in self.widgets:
+            w.handle_event(event)
+
+    def draw(self):
+        for w in self.widgets:
+            w.draw(self.surface)
 
 class UIManager:
     def __init__(self):
