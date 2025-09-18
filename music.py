@@ -399,6 +399,11 @@ class PlaylistWidget(Widget):
                         time.sleep(0.5)
                         self.debounce = False
                     threading.Thread(target=delayed).start()
+        elif event.type == pygame.MOUSEWHEEL:
+            if event.y > 0:
+                self.scroll = max(0, self.scroll - 1)
+            elif event.y < 0:
+                self.scroll = min(len(self.player.playlist) - self.rect.h // self.item_height, self.scroll + 1) # type: ignore
 
 class SearchBoxWidget(Widget):
     def __init__(self, rect, style, font, font_size, item_height: int, items: dict[str, Any] = {}, name = "", search_event = ""):
