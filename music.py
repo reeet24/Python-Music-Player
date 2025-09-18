@@ -24,6 +24,7 @@ settings = json.load(open("config/settings.json", "r"))
 if settings["auto_update_on_start"]:
     local_ver = updater.get_local_version()
     remote_ver = updater.get_remote_version()
+    print(f"Local version: {local_ver} | Remote version: {remote_ver}")
     if local_ver != remote_ver:
         updater.Update()
 
