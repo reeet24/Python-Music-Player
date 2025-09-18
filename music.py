@@ -550,14 +550,18 @@ def main():
             continue
 
     def do_save():
+        playlists = get_playlists()
         name = getattr(name_box, "query", "").strip()
         if name:
             player.save_playlist(name)
+        name_box.set_items(playlists)
 
     def do_load():
+        playlists = get_playlists()
         name = getattr(name_box, "query", "").strip()
         if name:
             player.load_playlist(name)
+        name_box.set_items(playlists)
 
     GlobalEventRegistry.register("download_button_pressed", on_download)
     GlobalEventRegistry.register("play_button_pressed", callback=(lambda: player.play()))
