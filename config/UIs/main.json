@@ -4,31 +4,36 @@
             "type": "button",
             "text": "Download",
             "fire_event": "download_button_pressed",
-            "rect": [548, 12, 120, 32]
+            "rect": [548, 12, 120, 32],
+            "border_radius": 5
         },
         "play_button": {
             "type": "button",
             "text": "Play",
             "fire_event": "play_button_pressed",
-            "rect": [12, 60, 90, 32]
+            "rect": [12, 60, 90, 32],
+            "border_radius": 5
         },
         "pause_button": {
             "type": "button",
             "text": "Pause",
             "fire_event": "pause_button_pressed",
-            "rect": [112, 60, 90, 32]
+            "rect": [112, 60, 90, 32],
+            "border_radius": 5
         },
         "resume_button": {
             "type": "button",
             "text": "Resume",
             "fire_event": "resume_button_pressed",
-            "rect": [212, 60, 90, 32]
+            "rect": [212, 60, 90, 32],
+            "border_radius": 5
         },
         "skip_button": {
             "type": "button",
             "text": "Skip",
             "fire_event": "skip_button_pressed",
-            "rect": [312, 60, 90, 32]
+            "rect": [312, 60, 90, 32],
+            "border_radius": 5
         },
         "volume_slider": {
             "type": "slider",
@@ -36,19 +41,23 @@
             "max_val": 100,
             "start_val": 50,
             "fire_event": "volume_slider_changed",
-            "rect": [420, 60, 200, 32]
+            "rect": [420, 60, 200, 32],
+            "border_radius": 5
         },
-        "save_button": {
+        "playlist_button": {
             "type": "button",
-            "text": "Save",
-            "fire_event": "save_button_pressed",
-            "rect": [548, 110, 110, 36]
+            "text": "Playlists",
+            "font_size": 20,
+            "fire_event": "playlist_button_pressed",
+            "rect": [548, 110, 110, 36],
+            "border_radius": 5
         },
-        "load_button": {
+        "song_button": {
             "type": "button",
-            "text": "Load",
-            "fire_event": "load_button_pressed",
-            "rect": [678, 110, 110, 36]
+            "text": "Songs",
+            "fire_event": "song_button_pressed",
+            "rect": [678, 110, 110, 36],
+            "border_radius": 5
         },
         "now_playing_label": {
             "type": "label",
@@ -65,7 +74,8 @@
             "font": "Arial",
             "font_size": 16,
             "item_height": 24,
-            "rect": [548, 152, 240, 256]
+            "rect": [548, 152, 240, 256],
+            "search_event": "playlist_selected"
         },
         "playlist": {
             "type": "PlaylistWidget",
@@ -76,6 +86,10 @@
         "url_box": {
             "type": "textbox",
             "rect": [12, 12, 520, 32]
+        },
+        "progress_bar": {
+            "type": "ProgressBar",
+            "rect": [14, 420, 516, 10]
         }
     }
 }

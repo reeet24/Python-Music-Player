@@ -1,3 +1,7 @@
 {
-    "auto_update_on_start": true
+    "auto_update_on_start": true,
+    "music_dir": "music",
+    "playlist_dir": "playlists",
+    "styles_file": "config/styles.json",
+    "ui_dir": "config/UIs"
 }

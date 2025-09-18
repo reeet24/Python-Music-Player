@@ -1,8 +1,12 @@
 # ui_framework.py
-from typing import Any, Callable
+import math
+from typing import Any, Callable, Optional
 import pygame
 import json
 import re
+import time
+import threading
+import pathlib
 
 class StyleManager:
     def __init__(self, style_file):
@@ -63,11 +67,12 @@ class Widget:
 
 
 class Button(Widget):
-    def __init__(self, rect, style, text, fire_event="", name = ""):
+    def __init__(self, rect, style, text, fire_event="", name = "", border_radius = 0, font: Optional[str] = None, font_size: Optional[int] = None):
         super().__init__(rect, style, name)
         self.text = text
         self.callback = fire_event
-        self.font = pygame.font.SysFont(self.style.get("font", None), self.style.get("font_size", 24))
+        self.font = pygame.font.SysFont(font or self.style.get("font", None), font_size or self.style.get("font_size", 24))
+        self.border_radius = border_radius
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
@@ -87,17 +92,17 @@ class Button(Widget):
             self.apply_style(self.style[self.state])
         bg = self.style.get("bg_color", (200, 200, 200))
         fg = self.style.get("fg_color", (0, 0, 0))
-        pygame.draw.rect(surface, bg, self.rect)
+        pygame.draw.rect(surface, bg, self.rect, border_radius=self.border_radius)
         text_surf = self.font.render(self.text, True, fg)
         text_rect = text_surf.get_rect(center=self.rect.center)
         surface.blit(text_surf, text_rect)
 
 
 class Label(Widget):
-    def __init__(self, rect, style, text, name = ""):
+    def __init__(self, rect, style, text, name = "", font: Optional[str] = None, font_size: Optional[int] = None):
         super().__init__(rect, style, name)
         self.text = text
-        self.font = pygame.font.SysFont(self.style.get("font", None), self.style.get("font_size", 24))
+        self.font = pygame.font.SysFont(font or self.style.get("font", None), font_size or self.style.get("font_size", 24))
 
     def set_text(self, text):
         self.text = text
@@ -112,22 +117,40 @@ class Label(Widget):
 
 
 class TextBox(Widget):
-    def __init__(self, rect, style, text="", name = ""):
+    def __init__(self, rect, style, text="", name = "", border_radius = 0, font: Optional[str] = None, font_size: Optional[int] = None):
         super().__init__(rect, style, name)
         self.text = text
-        self.font = pygame.font.SysFont(self.style.get("font", None), self.style.get("font_size", 24))
+        self.font = pygame.font.SysFont(font or self.style.get("font", None), font_size or self.style.get("font_size", 24))
         self.active = False
         self.cursor_visible = True
         self.cursor_timer = 0
+        self.border_radius = border_radius
+        self.mod = {
+            "shift": False,
+            "ctrl": False,
+            "backspace": False
+        }
+    
+    def _backspace_helper(self):
+        def backspace():
+            i = 0
+            length = len(self.text)
+            while length > 0 and self.mod["backspace"]:
+                length = len(self.text)
+                self.text = self.text[:-1]
+                i += 1
+                time.sleep((0.5 / i))
+        
+        threading.Thread(target=backspace).start()
+            
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             self.active = self.rect.collidepoint(event.pos)
         if self.active and event.type == pygame.KEYDOWN:
-            if (event.mod & pygame.KMOD_CTRL) and event.key == pygame.K_v:
+            if self.mod["ctrl"] and event.key == pygame.K_v:
                 # Paste from clipboard
                 try:
-                    pygame.scrap.init()
                     clip = pygame.scrap.get(pygame.SCRAP_TEXT)
                     if clip:
                         raw_text = clip.decode("utf-8")
@@ -135,18 +158,30 @@ class TextBox(Widget):
                         self.text += clean_text
                 except Exception:
                     pass
-            if event.key == pygame.K_BACKSPACE:
-                self.text = self.text[:-1]
+            elif event.key == pygame.K_BACKSPACE:
+                self.mod["backspace"] = True
+                self._backspace_helper()
             elif event.key == pygame.K_RETURN:
                 self.active = False
+            elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
+                self.mod["shift"] = True
+            elif event.key == pygame.K_LCTRL or event.key == pygame.K_RCTRL:
+                self.mod["ctrl"] = True
             else:
                 self.text += event.unicode
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
+                self.mod["shift"] = False
+            elif event.key == pygame.K_LCTRL or event.key == pygame.K_RCTRL:
+                self.mod["ctrl"] = False
+            elif event.key == pygame.K_BACKSPACE:
+                self.mod["backspace"] = False
 
     def draw(self, surface):
         bg = self.style.get("bg_color", (255, 255, 255))
         fg = self.style.get("fg_color", (0, 0, 0))
-        pygame.draw.rect(surface, bg, self.rect, border_radius=5)
-        pygame.draw.rect(surface, (0, 0, 0), self.rect, 2 if self.active else 1)
+        pygame.draw.rect(surface, bg, self.rect, border_radius=self.border_radius)
+        pygame.draw.rect(surface, (0, 0, 0), self.rect, 2 if self.active else 1, border_radius=self.border_radius)
 
         text_surf = self.font.render(self.text, True, fg)
         surface.blit(text_surf, (self.rect.x + 5, self.rect.y + 5))
@@ -161,13 +196,14 @@ class TextBox(Widget):
 
 
 class Slider(Widget):
-    def __init__(self, rect, style, min_val=0, max_val=100, start_val=50, fire_event="", name = ""):
+    def __init__(self, rect, style, min_val=0, max_val=100, start_val=50, fire_event="", name = "", border_radius = 0):
         super().__init__(rect, style, name)
         self.min_val = min_val
         self.max_val = max_val
         self.value = start_val
         self.callback = fire_event
         self.dragging = False
+        self.border_radius = border_radius
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
@@ -184,12 +220,14 @@ class Slider(Widget):
     def draw(self, surface):
         track_color = self.style.get("track_color", (180, 180, 180))
         knob_color = self.style.get("knob_color", (80, 80, 80))
-        pygame.draw.rect(surface, track_color, self.rect)
+        pygame.draw.rect(surface, track_color, self.rect, border_radius=self.border_radius)
+
+        knob_width = 10
 
         pct = (self.value - self.min_val) / (self.max_val - self.min_val)
         knob_x = self.rect.x + int(pct * self.rect.width)
-        knob_rect = pygame.Rect(knob_x - 5, self.rect.y, 10, self.rect.height)
-        pygame.draw.rect(surface, knob_color, knob_rect)
+        knob_rect = pygame.Rect(knob_x - (knob_width/2), self.rect.y, knob_width, self.rect.height)
+        pygame.draw.rect(surface, knob_color, knob_rect, border_radius=math.floor(self.border_radius/2))
 
 class Container(Widget):
     def __init__(self, rect, style, widgets=[], name = ""):
@@ -219,3 +257,86 @@ class UIManager:
     def draw(self, surface):
         for w in self.widgets:
             w.draw(surface)
+
+class JSONUILoader:
+    def __init__(self, scene_folder: pathlib.Path | str, style_file: str = "style.json"):
+        if isinstance(scene_folder, str):
+            scene_folder = pathlib.Path(scene_folder)
+        self.scene_folder = scene_folder
+        self.scenes = {}
+        self.widget_types = {
+            "container": Container,
+            "label": Label,
+            "button": Button,
+            "slider": Slider,
+            "textbox": TextBox
+        }
+        self.style_mgr = StyleManager(style_file)
+
+        for scene_file in scene_folder.iterdir():
+            with open(scene_file, "r") as f:
+                scene = json.load(f)
+                self.scenes[scene_file.stem] = scene
+
+    def reload_scenes(self):
+        self.scenes = {}
+        for scene_file in self.scene_folder.iterdir():
+            with open(scene_file, "r") as f:
+                scene = json.load(f)
+                self.scenes[scene_file.stem] = scene
+
+    def register_widget_type(self, widget_type: str, widget_class: type[Widget]):
+        """
+        Registers a new widget type.
+
+        :param widget_type: The type of the widget as a string.
+        :param widget_class: The class of the widget as a subclass of UI.Widget.
+        """
+        self.widget_types[widget_type] = widget_class
+
+    def _scene_to_ui(self, scene: dict):
+        """
+        Loads a UI from a JSON scene definition.
+
+        Args:
+            scene (dict): JSON scene definition
+
+        Returns:
+            UIManager: The loaded UI
+        """
+        ui = UIManager()
+        for key, widget in scene["widgets"].items():
+            widget_class = self.widget_types[widget["type"]]
+            args = widget
+            args["name"] = key
+            args["style"] = self.style_mgr.get_style(widget["type"], widget.get("state", "default"))
+            args.pop("type")
+            ui.add(widget_class(**args))
+        return ui
+
+    def load_scene(self, scene_name: str):
+        """
+        Load a scene from the scene folder and return its UI representation.
+
+        :param scene_name: The name of the scene to load.
+        :return: The UI representation of the scene.
+        """
+        return self._scene_to_ui(self.scenes[scene_name])
+    
+    def save_scene(self, scene_name: str, scene: dict):
+        """
+        Saves a scene to the scene folder.
+
+        :param scene_name: The name of the scene to save.
+        :param scene: The scene to save as a JSON dictionary.
+        """
+        with open(self.scene_folder / f"{scene_name}.json", "w") as f:
+            json.dump(scene, f, indent=4)
+
+    def get_scene_names(self):
+        """
+        Returns a list of all scene names currently loaded.
+
+        :return: List of scene names
+        """
+        return list(self.scenes.keys())

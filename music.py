@@ -8,8 +8,7 @@ import traceback
 from typing import Any, Optional
 import yt_dlp
 import pygame
-from utils.ui_framework import UIManager, Button, Label, TextBox, Slider, StyleManager, Widget, Container
-import utils.json_ui_loader as json_ui
+from utils.ui_framework import UIManager, Button, Label, TextBox, Slider, StyleManager, Widget, Container, GlobalEventRegistry, JSONUILoader, Event
 import pypresence
 import random
 from mutagen.mp3 import MP3
@@ -17,7 +16,7 @@ import subprocess, platform
 import requests
 import utils.updater as updater
 
-GlobalEventRegistry = json_ui.GlobalEventRegistry
+GlobalEventRegistry = GlobalEventRegistry
 
 settings = json.load(open("config/settings.json", "r"))
 
@@ -56,15 +55,17 @@ RPCDefault = {
 RPCdata = RPCDefault
 
 # ---- Configuration ----
-MUSIC_DIR = "music"
-PLAYLIST_DIR = "playlists"
-STYLES_FILE = "config/styles.json"
-UI_DIR = "config/UIs"
+MUSIC_DIR = settings["music_dir"] or "music"
+METADATA_DIR = f"{MUSIC_DIR}/metadata"
+PLAYLIST_DIR = settings["playlist_dir"] or "playlists"
+STYLES_FILE = settings["styles_file"] or "config/styles.json"
+UI_DIR = settings["ui_dir"] or "config/UIs"
 
-UI_Loader = json_ui.JSONUILoader(UI_DIR, STYLES_FILE)
+UI_Loader = JSONUILoader(UI_DIR, STYLES_FILE)
 
 os.makedirs(MUSIC_DIR, exist_ok=True)
 os.makedirs(PLAYLIST_DIR, exist_ok=True)
+os.makedirs(METADATA_DIR, exist_ok=True)
 
 pygame.init()
 pygame.mixer.init()
@@ -94,6 +95,38 @@ def get_playlists() -> dict[str, Any]:
         with open(os.path.join(PLAYLIST_DIR, playlist), "r", encoding="utf-8") as f:
             playlists[playlist[:-5]] = json.load(f)
     return playlists
+
+def save_song_metadata(metadata):
+    with open(f'{METADATA_DIR}/{metadata["title"]}.json', 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=2)
+    
+def load_song_metadata(title):
+    with open(f'{METADATA_DIR}/{title}.json', 'r', encoding='utf-8') as f:
+        return json.load(f)
+    
+def _get_song_metadata(song_path, youtube_id=None):
+    title = os.path.basename(song_path)
+    duration = None
+
+    try:
+        audio = MP3(song_path)
+        duration = int(audio.info.length)
+    except Exception as e:
+        print(f"Could not read {song_path}: {e}")
+
+    return {
+        "title": title,
+        "duration": duration,
+        "path": song_path,
+        "youtube_id": youtube_id
+    }
+
+def get_songs():
+    songs = {}
+    for metadata in os.listdir(METADATA_DIR):
+        with open(f'{METADATA_DIR}/{metadata}', 'r', encoding='utf-8') as f:
+            songs[metadata[:-5]] = json.load(f)
+    return songs
 
 # ---- Music backend ----
 class MusicPlayer:
@@ -154,6 +187,7 @@ class MusicPlayer:
                         "path": mp3_path,
                         "duration": duration
                     }
+                    save_song_metadata(entry)
                     self.playlist.append(entry)
                     self.ui_queue.put(("download_complete", entry))
                 else:
@@ -161,6 +195,20 @@ class MusicPlayer:
         except Exception as e:
             tb = traceback.format_exc()
             self.ui_queue.put(("download_failed", url, str(e), tb))
+
+    def check_music_dir_for_new_songs(self):
+        for song in os.listdir(MUSIC_DIR):
+            song_path = os.path.join(MUSIC_DIR, song)
+            if not os.path.exists(f'{METADATA_DIR}/{song}.json'):
+                metadata = _get_song_metadata(song_path)
+                save_song_metadata(metadata)
+                print(f"Found new song: {metadata['title']}")
+
+    def load_song(self, title):
+        metadata = load_song_metadata(title)
+        save_song_metadata(metadata)
+        self.playlist.append(metadata)
+        self.ui_queue.put(("song_added", metadata))
 
     def download_async(self, url):
         threading.Thread(target=self._download_worker, args=(url,), daemon=True).start()
@@ -353,20 +401,26 @@ class PlaylistWidget(Widget):
                     threading.Thread(target=delayed).start()
 
 class SearchBoxWidget(Widget):
-    def __init__(self, rect, style, font, font_size, item_height: int, items: dict[str, Any] = {}, name = ""):
+    def __init__(self, rect, style, font, font_size, item_height: int, items: dict[str, Any] = {}, name = "", search_event = ""):
         super().__init__(rect, style, name)
         self.font = pygame.font.SysFont(font or None, font_size)
         self.items = items
+        self.visible_items = {}
         self.query = ""
         self.selected = -1
         self.item_height = item_height
         self.active = False
         self.search_rect = pygame.Rect(self.rect.x + 4, self.rect.y + 4, self.rect.w, item_height)
+        self.search_event = search_event
+        self.mod = {
+            "backspace": False
+        }
 
     def set_items(self, items: dict[str, Any]):
         self.items = items
 
     def draw(self, surf):
+        self.visible_items = {}
         # Draw first item as search box, then draw all other items
         bg = tuple(self.style.get("bg_color", (30, 30, 30)))
         fg = tuple(self.style.get("fg_color", (230, 230, 230)))
@@ -387,6 +441,8 @@ class SearchBoxWidget(Widget):
 
             if not text.lower().startswith(self.query.lower()):
                 continue
+            
+            self.visible_items[text] = item
 
             item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
             if i == self.selected:
@@ -399,6 +455,18 @@ class SearchBoxWidget(Widget):
         # border
         pygame.draw.rect(surf, (0,0,0), self.rect, 2)
 
+    def _backspace_helper(self):
+        def backspace():
+            i = 0
+            length = len(self.query)
+            while length > 0 and self.mod["backspace"]:
+                length = len(self.query)
+                self.query = self.query[:-1]
+                i += 1
+                time.sleep((0.5 / i))
+        
+        threading.Thread(target=backspace).start()
+
     def handle_event(self, event):
 
         if event.type == pygame.KEYDOWN:
@@ -407,12 +475,14 @@ class SearchBoxWidget(Widget):
                 return
 
             if event.key == pygame.K_BACKSPACE:
-                self.query = self.query[:-1]
+                self.mod["backspace"] = True
+                self._backspace_helper()
             elif event.key == pygame.K_RETURN:
                 if self.selected >= 0:
                     self.active = False
                     self.query = list(self.items.keys())[self.selected]
                     self.selected = -1
+                    GlobalEventRegistry.dispatch(Event(self.search_event, {"query": self.query, "state": self.state}))
                     return
             elif event.key == pygame.K_ESCAPE:
                 self.active = False
@@ -422,8 +492,10 @@ class SearchBoxWidget(Widget):
                 self.selected = (self.selected - 1) % len(self.items)
             else:
                 self.query += event.unicode
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_BACKSPACE:
+                self.mod["backspace"] = False
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-
             #First check if we clicked on the text box and set active accordingly
             if self.search_rect.collidepoint(event.pos):
                 self.active = True
@@ -433,13 +505,9 @@ class SearchBoxWidget(Widget):
 
             local_y = event.pos[1] - self.rect.y
             idx = self.selected + (local_y // self.item_height)
-            if 0 <= idx < len(self.items):
-                self.selected = idx
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 3:
-            local_y = event.pos[1] - self.rect.y
-            idx = self.selected + (local_y // self.item_height)
-            if 0 <= idx < len(self.items):
-                self.selected = idx
+            if 0 <= idx < len(self.visible_items) and self.rect.collidepoint(event.pos):
+                self.query = list(self.visible_items)[idx]
+                GlobalEventRegistry.dispatch(Event(self.search_event, {"query": self.query, "state": self.state}))
 
 class ProgressBar(Widget):
     def __init__(self, rect, style, name = ""):
@@ -520,19 +588,10 @@ def main():
     ui = UI_Loader.load_scene("main")
     ui_queue = queue.Queue()
     player = MusicPlayer(ui_queue)
-
-    # Online Manager
+    player.check_music_dir_for_new_songs()
     online_manager = OnlineManager()
-    
     online_manager.init_connection_loop()
-
-    
-
     playlists = get_playlists()
-
-    # Song progress bar
-    progress_bar = ProgressBar(rect=(14, 420, 516, 10), style=safe_style_get(style_mgr, "ProgressBar"))
-    ui.add(progress_bar)
 
     # Assigning important widgets to variables
     for w in ui.widgets:
@@ -549,9 +608,12 @@ def main():
                 playlist.set_player(player)
             elif w.name == "url_box":
                 url_box = w
+            elif w.name == "progress_bar":
+                progress_bar = w
         except AttributeError:
             continue
 
+    # Helper functions for UI events
     def on_download():
         urls_text = getattr(url_box, "text", "").strip()
         if not urls_text:
@@ -564,31 +626,35 @@ def main():
         # clear input
         url_box.text = ""
 
-    def do_save():
-        name = getattr(name_box, "query", "").strip()
-        if name:
-            player.save_playlist(name)
-        playlists = get_playlists()
-        name_box.set_items(playlists)
+    def name_box_state_change(state: bool = True):
+        if state:
+            name_box.state = "default"
+            name_box.set_items(get_playlists())
+        else:
+            name_box.state = "song"
+            name_box.set_items(get_songs())
+    
+    def on_search(query: str, state: str):
+        if state == "default":
+            player.load_playlist(query)
+        elif state == "song":
+            player.load_song(query)
 
-    def do_load():
-        name = getattr(name_box, "query", "").strip()
-        if name:
-            player.load_playlist(name)
-        playlists = get_playlists()
-        name_box.set_items(playlists)
+    GlobalEventRegistry.register("playlist_selected", callback=on_search)
 
     GlobalEventRegistry.register("download_button_pressed", on_download)
     GlobalEventRegistry.register("play_button_pressed", callback=(lambda: player.play()))
     GlobalEventRegistry.register("pause_button_pressed", callback=(lambda: player.pause()))
     GlobalEventRegistry.register("resume_button_pressed", callback=(lambda: player.resume()))
     GlobalEventRegistry.register("skip_button_pressed", callback=(lambda: player.skip()))
-    GlobalEventRegistry.register("save_button_pressed", callback=(lambda: do_save()))
-    GlobalEventRegistry.register("load_button_pressed", callback=(lambda: do_load()))
+    GlobalEventRegistry.register("playlist_button_pressed", callback=(lambda: name_box_state_change()))
+    GlobalEventRegistry.register("song_button_pressed", callback=(lambda: name_box_state_change(False)))
 
     GlobalEventRegistry.register("volume_slider_changed", callback=(lambda value: player.set_volume(value/100)))
     
     # UI loop
+    
+    pygame.scrap.init()
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
