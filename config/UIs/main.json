@@ -32,7 +32,7 @@
         },
         "volume_slider": {
             "type": "slider",
-            "min_val": 0,
+            "min_val": 1,
             "max_val": 100,
             "start_val": 50,
             "fire_event": "volume_slider_changed",

@@ -556,7 +556,7 @@ def main():
     GlobalEventRegistry.register("save_button_pressed", callback=(lambda: do_save()))
     GlobalEventRegistry.register("load_button_pressed", callback=(lambda: do_load()))
 
-    GlobalEventRegistry.register("volume_slider_changed", callback=(lambda value: print("Volume set to", value) and player.set_volume(value/100)))
+    GlobalEventRegistry.register("volume_slider_changed", callback=(lambda value: player.set_volume(value/100)))
     
     # UI loop
     while running:
