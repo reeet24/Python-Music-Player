@@ -3,20 +3,26 @@
     "default": {
       "bg_color": [40, 40, 40],
       "fg_color": [220, 220, 220],
+      "font": "Arial",
       "font_size": 24
     },
     "hover": {
       "bg_color": [60, 60, 60],
-      "fg_color": [255, 255, 255]
+      "fg_color": [255, 255, 255],
+      "font": "Arial",
+      "font_size": 24
     },
     "pressed": {
       "bg_color": [25, 25, 25],
-      "fg_color": [180, 180, 180]
+      "fg_color": [180, 180, 180],
+      "font": "Arial",
+      "font_size": 24
     }
   },
   "Label": {
     "default": {
       "fg_color": [230, 230, 230],
+      "font": "Arial",
       "font_size": 22
     }
   },
@@ -24,6 +30,7 @@
     "default": {
       "bg_color": [30, 30, 30],
       "fg_color": [220, 220, 220],
+      "font": "Arial",
       "font_size": 20
     }
   },
@@ -38,6 +45,7 @@
       "bg_color": [30,30,30], 
       "fg_color": [220,220,220], 
       "selected_bg": [80,120,180],
+      "font": "Arial",
       "font_size": 20,
       "search_box_color": [40, 40, 40]
     }
@@ -47,6 +55,7 @@
       "bg_color": [30,30,30], 
       "fg_color": [220,220,220], 
       "selected_bg": [80,120,180],
+      "font": "Arial",
       "font_size": 20,
       "search_box_color": [40, 40, 40]
     }

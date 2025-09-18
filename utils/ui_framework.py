@@ -67,7 +67,7 @@ class Button(Widget):
         super().__init__(rect, style, name)
         self.text = text
         self.callback = fire_event
-        self.font = pygame.font.Font(self.style.get("font", None), self.style.get("font_size", 24))
+        self.font = pygame.font.SysFont(self.style.get("font", None), self.style.get("font_size", 24))
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
@@ -97,7 +97,7 @@ class Label(Widget):
     def __init__(self, rect, style, text, name = ""):
         super().__init__(rect, style, name)
         self.text = text
-        self.font = pygame.font.Font(None, self.style.get("font_size", 24))
+        self.font = pygame.font.SysFont(self.style.get("font", None), self.style.get("font_size", 24))
 
     def set_text(self, text):
         self.text = text
@@ -115,7 +115,7 @@ class TextBox(Widget):
     def __init__(self, rect, style, text="", name = ""):
         super().__init__(rect, style, name)
         self.text = text
-        self.font = pygame.font.Font(None, self.style.get("font_size", 24))
+        self.font = pygame.font.SysFont(self.style.get("font", None), self.style.get("font_size", 24))
         self.active = False
         self.cursor_visible = True
         self.cursor_timer = 0
