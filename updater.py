@@ -6,9 +6,9 @@ import tempfile
 import shutil
 
 # --- Config ---
-REPO = "reeet24/Python-Music-Player"  # format: "owner/repo"
+REPO = "reeet24/Python-Music-Player" 
 BRANCH = "main"
-VERSION_FILE = "version.txt"  # must exist both locally and in the repo root
+VERSION_FILE = "version.txt"
 
 def get_local_version() -> str:
     if os.path.exists(VERSION_FILE):
