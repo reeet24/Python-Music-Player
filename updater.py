@@ -58,7 +58,7 @@ def update_files(new_dir: str):
         else:
             shutil.copy2(src, dst)
 
-def main():
+def Update():
     local = get_local_version()
     remote = get_remote_version()
     print(f"Local version: {local}")
@@ -66,7 +66,7 @@ def main():
 
     if local == remote:
         print("Already up-to-date.")
-        return
+        return True
 
     print("Updating...")
     new_dir, temp_dir = download_and_extract()
@@ -79,4 +79,4 @@ def main():
     sys.exit(0)
 
 if __name__ == "__main__":
-    main()
+    Update()

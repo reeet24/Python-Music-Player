@@ -15,8 +15,17 @@ import random
 from mutagen.mp3 import MP3
 import subprocess, platform
 import requests
+import updater
 
 GlobalEventRegistry = json_ui.GlobalEventRegistry
+
+settings = json.load(open("config/settings.json", "r"))
+
+if settings["auto_update_on_start"]:
+    local_ver = updater.get_local_version()
+    remote_ver = updater.get_remote_version()
+    if local_ver != remote_ver:
+        updater.Update()
 
 class RPCWraper(pypresence.Presence):
     def __init__(self):
