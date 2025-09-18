@@ -106,7 +106,7 @@ class MusicPlayer:
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-            "quiet": True,
+            "quiet": False,
             "noplaylist": True,
             "nopart": True,
             "geo_bypass": True,  # optional: bypass some region restrictions
@@ -234,8 +234,7 @@ class MusicPlayer:
         except Exception as e:
             self.ui_queue.put(("load_failed", str(e)))
 
-# ---- Minimal playlist widget that fits your framework interface ----
-# The UIManager expects objects with `handle_event(event)` and `draw(surface)` methods.
+
 class PlaylistWidget(Widget):
     def __init__(self, rect, style, font, font_size, player: Optional[MusicPlayer] = None, name = ""):
         self.name = name
@@ -548,7 +547,7 @@ def main():
         if name:
             player.load_playlist(name)
 
-    GlobalEventRegistry.register("download_button", on_download)
+    GlobalEventRegistry.register("download_button_pressed", on_download)
     GlobalEventRegistry.register("play_button_pressed", callback=(lambda: player.play()))
     GlobalEventRegistry.register("pause_button_pressed", callback=(lambda: player.pause()))
     GlobalEventRegistry.register("resume_button_pressed", callback=(lambda: player.resume()))
