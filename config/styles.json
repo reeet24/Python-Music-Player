@@ -1,5 +1,5 @@
 {
-  "Button": {
+  "button": {
     "default": {
       "bg_color": [40, 40, 40],
       "fg_color": [220, 220, 220],
@@ -19,14 +19,14 @@
       "font_size": 24
     }
   },
-  "Label": {
+  "label": {
     "default": {
       "fg_color": [230, 230, 230],
       "font": "Arial",
-      "font_size": 22
+      "font_size": 16
     }
   },
-  "TextBox": {
+  "textbox": {
     "default": {
       "bg_color": [30, 30, 30],
       "fg_color": [220, 220, 220],

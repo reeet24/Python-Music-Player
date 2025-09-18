@@ -15,7 +15,7 @@ import random
 from mutagen.mp3 import MP3
 import subprocess, platform
 import requests
-import updater
+import utils.updater as updater
 
 GlobalEventRegistry = json_ui.GlobalEventRegistry
 
@@ -525,21 +525,7 @@ def main():
     
     online_manager.init_connection_loop()
 
-    # Widgets
-    url_box = TextBox(rect=(12, 12, 520, 32), style=safe_style_get(style_mgr, "TextBox", {"bg_color":[255,255,255]}))
-    ui.add(url_box)
-
-    def on_download():
-        urls_text = getattr(url_box, "text", "").strip()
-        if not urls_text:
-            return
-        # split by newline to allow pasting multiple links at once
-        urls = [u.strip() for u in urls_text.splitlines() if u.strip()]
-        for url in urls:
-            player.download_async(url)
-        ui_queue.put(("download_started", urls_text))
-        # clear input
-        url_box.text = ""
+    
 
     playlists = get_playlists()
 
@@ -559,8 +545,22 @@ def main():
             elif w.name == "playlist":
                 playlist = w
                 playlist.set_player(player)
+            elif w.name == "url_box":
+                url_box = w
         except AttributeError:
             continue
+
+    def on_download():
+        urls_text = getattr(url_box, "text", "").strip()
+        if not urls_text:
+            return
+        # split by newline to allow pasting multiple links at once
+        urls = [u.strip() for u in urls_text.splitlines() if u.strip()]
+        for url in urls:
+            player.download_async(url)
+        ui_queue.put(("download_started", urls_text))
+        # clear input
+        url_box.text = ""
 
     def do_save():
         name = getattr(name_box, "query", "").strip()

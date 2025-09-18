@@ -72,6 +72,10 @@
             "font": "Arial",
             "font_size": 18,
             "rect": [12, 110, 520, 340]
+        },
+        "url_box": {
+            "type": "textbox",
+            "rect": [12, 12, 520, 32]
         }
     }
 }
