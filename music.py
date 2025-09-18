@@ -95,6 +95,8 @@ class MusicPlayer:
         self.volume = 0.8
         pygame.mixer.music.set_volume(self.volume)
         self.is_online = True
+        self.is_playing = False
+        self.is_stopped = True
 
     # Blocking download routine — run in a background thread
     def _download_worker(self, url):
@@ -178,21 +180,31 @@ class MusicPlayer:
                     "small_image": "resources/logo.png",
                     "small_text": "Terra's Music Player"
                 }
+            self.is_playing = True
+            self.is_stopped = False
         except Exception as e:
             self.ui_queue.put(("play_error", str(e)))
 
     def pause(self):
-        pygame.mixer.music.pause()
-        self.ui_queue.put(("paused", None))
+        if self.is_playing:
+            self.is_playing = False
+            pygame.mixer.music.pause()
+            self.ui_queue.put(("paused", None))
 
     def resume(self):
-        pygame.mixer.music.unpause()
-        self.ui_queue.put(("resumed", None))
+        if not self.is_playing and not self.is_stopped:
+            self.is_playing = True
+            pygame.mixer.music.unpause()
+            self.ui_queue.put(("resumed", None))
 
     def stop(self):
-        pygame.mixer.music.stop()
-        RPCdata = RPCDefault
-        self.ui_queue.put(("stopped", None))
+        global RPCdata
+        if not self.is_stopped:
+            self.is_playing = False
+            self.is_stopped = True
+            pygame.mixer.music.stop()
+            RPCdata = RPCDefault
+            self.ui_queue.put(("stopped", None))
 
     def skip(self):
         if not self.playlist:
