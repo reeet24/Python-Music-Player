@@ -5,19 +5,33 @@ import threading
 import queue
 import time
 import traceback
-from typing import Any
+from typing import Any, Optional
 import yt_dlp
 import pygame
 from utils.ui_framework import UIManager, Button, Label, TextBox, Slider, StyleManager, Widget, Container
+import utils.json_ui_loader as json_ui
 import pypresence
 import random
 from mutagen.mp3 import MP3
 import subprocess, platform
+import requests
 
-rpc = pypresence.Presence("1417624017883500596")
-RPCdata = None
+GlobalEventRegistry = json_ui.GlobalEventRegistry
 
-rpc.connect()
+class RPCWraper(pypresence.Presence):
+    def __init__(self):
+        super().__init__("1417624017883500596")
+        self.Connected = False
+    
+    def _connect(self):
+        self.Connected = True
+        self.connect()
+    
+    def _close(self):
+        self.Connected = False
+        self.close()
+
+rpc = RPCWraper()
 
 RPCDefault = {
     "details": "Terra's Music Player",
@@ -31,12 +45,13 @@ RPCDefault = {
 
 RPCdata = RPCDefault
 
-rpc.update(**RPCdata)
-
 # ---- Configuration ----
 MUSIC_DIR = "music"
 PLAYLIST_DIR = "playlists"
 STYLES_FILE = "config/styles.json"
+UI_DIR = "config/UIs"
+
+UI_Loader = json_ui.JSONUILoader(UI_DIR, STYLES_FILE)
 
 os.makedirs(MUSIC_DIR, exist_ok=True)
 os.makedirs(PLAYLIST_DIR, exist_ok=True)
@@ -79,6 +94,7 @@ class MusicPlayer:
         self.current_title = ""
         self.volume = 0.8
         pygame.mixer.music.set_volume(self.volume)
+        self.is_online = True
 
     # Blocking download routine — run in a background thread
     def _download_worker(self, url):
@@ -152,15 +168,16 @@ class MusicPlayer:
             pygame.mixer.music.play()
             self.current_title = track["title"]
             self.ui_queue.put(("play_started", self.index, self.current_title))
-            RPCdata = {
-                "details": get_random_flavor_message(),
-                "state": "Listening to " + self.current_title,
-                "start": int(time.time()),
-                "large_image": "resources/logo.png",
-                "large_text": "Terra's Music Player",
-                "small_image": "resources/logo.png",
-                "small_text": "Terra's Music Player"
-            }
+            if self.is_online:
+                RPCdata = {
+                    "details": get_random_flavor_message(),
+                    "state": "Listening to " + self.current_title,
+                    "start": int(time.time()),
+                    "large_image": "resources/logo.png",
+                    "large_text": "Terra's Music Player",
+                    "small_image": "resources/logo.png",
+                    "small_text": "Terra's Music Player"
+                }
         except Exception as e:
             self.ui_queue.put(("play_error", str(e)))
 
@@ -219,11 +236,12 @@ class MusicPlayer:
 
 # ---- Minimal playlist widget that fits your framework interface ----
 # The UIManager expects objects with `handle_event(event)` and `draw(surface)` methods.
-class PlaylistWidget:
-    def __init__(self, rect, style, font, player):
+class PlaylistWidget(Widget):
+    def __init__(self, rect, style, font, font_size, player: Optional[MusicPlayer] = None, name = ""):
+        self.name = name
         self.rect = pygame.Rect(rect)
         self.style = style or {}
-        self.font = font
+        self.font = pygame.font.SysFont(font or None, font_size)
         self.player = player
         self.item_height = max(20, self.font.get_linesize() + 4)
         self.selected = 0
@@ -231,6 +249,9 @@ class PlaylistWidget:
         self.dragging = None
         self.shift_down = False
         self.debounce = False
+
+    def set_player(self, player: MusicPlayer):
+        self.player = player
 
     def draw(self, surf):
         bg = tuple(self.style.get("bg_color", (30, 30, 30)))
@@ -242,15 +263,15 @@ class PlaylistWidget:
         surf.set_clip(self.rect)
         x, y = self.rect.x + 4, self.rect.y + 4
         visible = self.rect.h // self.item_height
-        for i in range(self.scroll, min(len(self.player.playlist), self.scroll + visible)):
-            entry = self.player.playlist[i]
+        for i in range(self.scroll, min(len(self.player.playlist), self.scroll + visible)): # type: ignore
+            entry = self.player.playlist[i] # type: ignore
             title = entry["title"]
             dur = entry.get("duration", 0)
             mins, secs = divmod(dur, 60)
             text = f"{i+1}. {title} [{mins}:{secs:02d}]"
 
             item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
-            if i == self.player.index:
+            if i == self.player.index: # type: ignore
                 pygame.draw.rect(surf, sel_bg, item_rect)
 
             txtsurf = self.font.render(text, True, fg)
@@ -273,22 +294,22 @@ class PlaylistWidget:
             if self.rect.collidepoint(event.pos):
                 local_y = event.pos[1] - self.rect.y
                 idx = self.scroll + (local_y // self.item_height)
-                if 0 <= idx < len(self.player.playlist):
+                if 0 <= idx < len(self.player.playlist): # type: ignore
                     self.dragging = idx
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragging is not None:
             local_y = event.pos[1] - self.rect.y
             new_idx = self.scroll + (local_y // self.item_height)
-            if 0 <= new_idx < len(self.player.playlist):
-                item = self.player.playlist.pop(self.dragging)
-                self.player.playlist.insert(new_idx, item)
+            if 0 <= new_idx < len(self.player.playlist): # type: ignore
+                item = self.player.playlist.pop(self.dragging) # type: ignore
+                self.player.playlist.insert(new_idx, item) # type: ignore
             self.dragging = None
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             if self.rect.collidepoint(event.pos):
                 local_y = event.pos[1] - self.rect.y
                 idx = self.scroll + (local_y // self.item_height)
-                if 0 <= idx < len(self.player.playlist):
+                if 0 <= idx < len(self.player.playlist): # type: ignore
                     # Right-click context: delete or reveal
-                    entry = self.player.playlist[idx]
+                    entry = self.player.playlist[idx] # type: ignore
 
                     if self.debounce:
                         return
@@ -296,7 +317,7 @@ class PlaylistWidget:
                     self.debounce = True
 
                     if self.shift_down:
-                        self.player.playlist.pop(idx)
+                        self.player.playlist.pop(idx) # type: ignore
                         return
                     
                     if platform.system() == "Windows":
@@ -311,15 +332,18 @@ class PlaylistWidget:
                     threading.Thread(target=delayed).start()
 
 class SearchBoxWidget(Widget):
-    def __init__(self, rect, style, font, item_height: int, items: dict[str, Any]):
-        super().__init__(rect, style)
-        self.font = font
+    def __init__(self, rect, style, font, font_size, item_height: int, items: dict[str, Any] = {}, name = ""):
+        super().__init__(rect, style, name)
+        self.font = pygame.font.SysFont(font or None, font_size)
         self.items = items
         self.query = ""
         self.selected = -1
         self.item_height = item_height
         self.active = False
         self.search_rect = pygame.Rect(self.rect.x + 4, self.rect.y + 4, self.rect.w, item_height)
+
+    def set_items(self, items: dict[str, Any]):
+        self.items = items
 
     def draw(self, surf):
         # Draw first item as search box, then draw all other items
@@ -333,6 +357,7 @@ class SearchBoxWidget(Widget):
         x, y = self.rect.x + 4, self.rect.y + 4
 
         # search box
+        pygame.draw.rect(surf, tuple(self.style.get("search_box_color", (50, 50, 50))), self.search_rect)
         txtsurf = self.font.render(self.query or "Search", True, fg)
         surf.blit(txtsurf, (x, y))
         y += self.item_height
@@ -391,8 +416,72 @@ class SearchBoxWidget(Widget):
             if 0 <= idx < len(self.items):
                 self.selected = idx
 
+class ProgressBar(Widget):
+    def __init__(self, rect, style, name = ""):
+        super().__init__(rect, style, name)
+        self.progress = 0.0 # 0-100
+        self.enabled = True
+    
+    def draw(self, surf):
+        if not self.enabled:
+            return
+        bg = tuple(self.style.get("bg_color", (30, 30, 30)))
+        fg = tuple(self.style.get("fg_color", (230, 230, 230)))
+        progress = self.progress / 100
+        pygame.draw.rect(surf, bg, self.rect)
+        pygame.draw.rect(surf, fg, (self.rect.x, self.rect.y, self.rect.w * progress, self.rect.h))
+    
+        # border
+        pygame.draw.rect(surf, (0,0,0), self.rect, 2)
+
+# A class to manage online actions and allow for offline use.
+class OnlineManager:
+    def __init__(self):
+        self.online = True
+        self.running = True
+
+    def _connection_loop(self):
+        while self.running:
+            self.check_status()
+            if not self.is_online():
+                if rpc.Connected:
+                    rpc._close()
+                continue
+
+            if not rpc.Connected:
+                rpc._connect()
+
+            if RPCdata:
+                rpc.update(**RPCdata)
+            else:
+                rpc.clear()
+            time.sleep(1)
+
+    def init_connection_loop(self):
+        threading.Thread(target=self._connection_loop).start()
+
+    def check_status(self):
+        try:
+            requests.get("https://www.google.com", timeout=1)
+            if not self.online:
+                print("Online")
+            self.online = True
+        except Exception:
+            if self.online:
+                print("Offline")
+            self.online = False
+    
+    def is_online(self):
+        return self.online
+    
+# Register custom widgets
+UI_Loader.register_widget_type("SearchBox", SearchBoxWidget)
+UI_Loader.register_widget_type("ProgressBar", ProgressBar)
+UI_Loader.register_widget_type("PlaylistWidget", PlaylistWidget)
+
 # ---- Main UI assembly ----
 def main():
+    running = True
     screen = pygame.display.set_mode((800, 480))
     pygame.display.set_caption("Pygame yt_dlp Music — Widget UI")
     clock = pygame.time.Clock()
@@ -403,12 +492,14 @@ def main():
     except Exception:
         style_mgr = None
 
-    ui = UIManager()
+    ui = UI_Loader.load_scene("main")
     ui_queue = queue.Queue()
     player = MusicPlayer(ui_queue)
 
-    # font
-    font = pygame.font.SysFont("Arial", 18)
+    # Online Manager
+    online_manager = OnlineManager()
+    
+    online_manager.init_connection_loop()
 
     # Widgets
     url_box = TextBox(rect=(12, 12, 520, 32), style=safe_style_get(style_mgr, "TextBox", {"bg_color":[255,255,255]}))
@@ -426,36 +517,26 @@ def main():
         # clear input
         url_box.text = ""
 
-    btn_download = Button(rect=(548, 12, 120, 32), style=safe_style_get(style_mgr, "Button"), text="Download", callback=on_download)
-    ui.add(btn_download)
-
-    btn_play = Button(rect=(12, 60, 90, 32), style=safe_style_get(style_mgr, "Button"), text="Play", callback=lambda: player.play())
-    ui.add(btn_play)
-    btn_pause = Button(rect=(112, 60, 90, 32), style=safe_style_get(style_mgr, "Button"), text="Pause", callback=player.pause)
-    ui.add(btn_pause)
-    btn_resume = Button(rect=(212, 60, 90, 32), style=safe_style_get(style_mgr, "Button"), text="Resume", callback=player.resume)
-    ui.add(btn_resume)
-    btn_skip = Button(rect=(312, 60, 90, 32), style=safe_style_get(style_mgr, "Button"), text="Skip", callback=player.skip)
-    ui.add(btn_skip)
-
-    # Volume slider (0..100)
-    def volume_cb(val):
-        # slider expected to send 0..100
-        player.set_volume(val / 100.0)
-
-    slider = Slider(rect=(420, 60, 200, 28), style=safe_style_get(style_mgr, "Slider"), min_val=0, max_val=100, start_val=int(player.volume * 100), callback=volume_cb)
-    ui.add(slider)
-
-    # Playlist widget (left)
-    playlist_style = safe_style_get(style_mgr, "ListBox", {"bg_color":[30,30,30], "fg_color":[230,230,230], "selected_bg":[80,80,120]})
-    playlist = PlaylistWidget(rect=(12, 110, 520, 340), style=playlist_style, font=font, player=player)
-    ui.add(playlist)
-
-    # Replace the name_box with a SearchBoxWidget
-    searchFont = pygame.font.SysFont("Arial", 18)
     playlists = get_playlists()
-    name_box = SearchBoxWidget(rect=(548, 152, 240, 256), style=safe_style_get(style_mgr, "ListBox"), font=searchFont, item_height=24, items=playlists)
-    ui.add(name_box)
+
+    # Song progress bar
+    progress_bar = ProgressBar(rect=(14, 420, 516, 10), style=safe_style_get(style_mgr, "ProgressBar"))
+    ui.add(progress_bar)
+
+    for w in ui.widgets:
+        try:
+            if w.name == "status_label":
+                status_label = w
+            elif w.name == "now_playing_label":
+                now_label = w
+            elif w.name == "name_box":
+                name_box = w
+                name_box.set_items(playlists)
+            elif w.name == "playlist":
+                playlist = w
+                playlist.set_player(player)
+        except AttributeError:
+            continue
 
     def do_save():
         name = getattr(name_box, "query", "").strip()
@@ -467,31 +548,22 @@ def main():
         if name:
             player.load_playlist(name)
 
-    btn_save = Button(rect=(548, 110, 110, 36), style=safe_style_get(style_mgr, "Button"), text="Save Playlist", callback=do_save)
-    ui.add(btn_save)
-    btn_load = Button(rect=(678, 110, 110, 36), style=safe_style_get(style_mgr, "Button"), text="Load Playlist", callback=do_load)
-    ui.add(btn_load)
+    GlobalEventRegistry.register("download_button", on_download)
+    GlobalEventRegistry.register("play_button_pressed", callback=(lambda: player.play()))
+    GlobalEventRegistry.register("pause_button_pressed", callback=(lambda: player.pause()))
+    GlobalEventRegistry.register("resume_button_pressed", callback=(lambda: player.resume()))
+    GlobalEventRegistry.register("skip_button_pressed", callback=(lambda: player.skip()))
+    GlobalEventRegistry.register("save_button_pressed", callback=(lambda: do_save()))
+    GlobalEventRegistry.register("load_button_pressed", callback=(lambda: do_load()))
 
-    # Now playing label
-    now_label_style = safe_style_get(style_mgr, "Label")
-    now_label = Label(rect=(12, 460, 500, 28), style=now_label_style, text="Now: (stopped)")
-    ui.add(now_label)
-
-    # Small status area
-    status_label = Label(rect=(12, 460 - 28, 780, 28), style=safe_style_get(style_mgr, "Label"), text="Status: idle")
-    ui.add(status_label)
-
-    # Filter box
-    filter_box = TextBox(rect=(12, 90, 520, 20), style=safe_style_get(style_mgr, "TextBox"))
-    ui.add(filter_box)
-
-
-    running = True
+    GlobalEventRegistry.register("volume_slider_changed", callback=(lambda value: print("Volume set to", value) and player.set_volume(value/100)))
+    
     # UI loop
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+                online_manager.running = False
             elif event.type == TRACK_END_EVENT:
                 # automatic skip when track ends
                 player.skip()
@@ -568,21 +640,18 @@ def main():
             entry = player.playlist[player.index]
             dur = entry.get("duration", 0)
             if dur > 0:
+                progress_bar.enabled = True
                 elapsed = pygame.mixer.music.get_pos() // 1000
-                ratio = min(1.0, elapsed / dur)
-                bar_rect = pygame.Rect(14, 420, 516, 10)
-                pygame.draw.rect(screen, (80,80,80), bar_rect)
-                fill_rect = pygame.Rect(bar_rect.x, bar_rect.y, int(bar_rect.w * ratio), bar_rect.h)
-                pygame.draw.rect(screen, (120,200,120), fill_rect)
+                ratio = min(1.0, elapsed / dur) * 100
+                progress_bar.progress = ratio
+            else:
+                progress_bar.enabled = False
+                
         pygame.display.flip()
         clock.tick(60)
 
-        if RPCdata:
-            rpc.update(**RPCdata)
-        else:
-            rpc.clear()
-
     pygame.quit()
+    
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,5 @@
 # ui_framework.py
+from typing import Any, Callable
 import pygame
 import json
 import re
@@ -10,19 +11,47 @@ class StyleManager:
 
     def get_style(self, widget_type, state="default"):
         return self.styles.get(widget_type, {}).get(state, {})
+    
+class Event:
+    def __init__(self, type, data = {}):
+        self.type = type
+        self.data = data
+    
+class UIEventRegistry:
+    def __init__(self):
+        self.registry: dict[str, list[Callable]] = {}
+        self.event_queue: list[Event] = []
 
+    def register(self, event_type, callback):
+        if event_type not in self.registry:
+            self.registry[event_type] = []
+        self.registry[event_type].append(callback)
+    
+    def dispatch(self, event: Event):
+        if event.type in self.registry:
+            for callback in self.registry[event.type]:
+                callback(**event.data)
+    
+    def process_next_event(self):
+        if self.event_queue:
+            event = self.event_queue.pop(0)
+            self.dispatch(event)
+
+GlobalEventRegistry = UIEventRegistry()
 
 class Widget:
-    def __init__(self, rect, style):
+    def __init__(self, rect, style, name = ""):
         self.rect = pygame.Rect(rect)
         self.style = style
         self.state = "default"
         self.visible = True
+        self.name = name
 
     def apply_style(self, style):
         self.style.update(style)
 
     def handle_event(self, event):
+        
         pass
 
     def draw(self, surface):
@@ -34,17 +63,17 @@ class Widget:
 
 
 class Button(Widget):
-    def __init__(self, rect, style, text, callback=None):
-        super().__init__(rect, style)
+    def __init__(self, rect, style, text, fire_event="", name = ""):
+        super().__init__(rect, style, name)
         self.text = text
-        self.callback = callback
-        self.font = pygame.font.Font(None, self.style.get("font_size", 24))
+        self.callback = fire_event
+        self.font = pygame.font.Font(self.style.get("font", None), self.style.get("font_size", 24))
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
             self.state = "pressed"
             if self.callback:
-                self.callback()
+                GlobalEventRegistry.dispatch(Event(self.callback))
         elif event.type == pygame.MOUSEMOTION:
             if self.rect.collidepoint(event.pos):
                 self.state = "hover"
@@ -65,8 +94,8 @@ class Button(Widget):
 
 
 class Label(Widget):
-    def __init__(self, rect, style, text):
-        super().__init__(rect, style)
+    def __init__(self, rect, style, text, name = ""):
+        super().__init__(rect, style, name)
         self.text = text
         self.font = pygame.font.Font(None, self.style.get("font_size", 24))
 
@@ -83,8 +112,8 @@ class Label(Widget):
 
 
 class TextBox(Widget):
-    def __init__(self, rect, style, text=""):
-        super().__init__(rect, style)
+    def __init__(self, rect, style, text="", name = ""):
+        super().__init__(rect, style, name)
         self.text = text
         self.font = pygame.font.Font(None, self.style.get("font_size", 24))
         self.active = False
@@ -132,12 +161,12 @@ class TextBox(Widget):
 
 
 class Slider(Widget):
-    def __init__(self, rect, style, min_val=0, max_val=100, start_val=50, callback=None):
-        super().__init__(rect, style)
+    def __init__(self, rect, style, min_val=0, max_val=100, start_val=50, fire_event="", name = ""):
+        super().__init__(rect, style, name)
         self.min_val = min_val
         self.max_val = max_val
         self.value = start_val
-        self.callback = callback
+        self.callback = fire_event
         self.dragging = False
 
     def handle_event(self, event):
@@ -150,7 +179,7 @@ class Slider(Widget):
             pct = max(0, min(1, rel_x / self.rect.width))
             self.value = self.min_val + pct * (self.max_val - self.min_val)
             if self.callback:
-                self.callback(self.value)
+                GlobalEventRegistry.dispatch(Event(self.callback, {"value": self.value}))
 
     def draw(self, surface):
         track_color = self.style.get("track_color", (180, 180, 180))
@@ -163,8 +192,8 @@ class Slider(Widget):
         pygame.draw.rect(surface, knob_color, knob_rect)
 
 class Container(Widget):
-    def __init__(self, rect, style, widgets=[]):
-        super().__init__(rect, style)
+    def __init__(self, rect, style, widgets=[], name = ""):
+        super().__init__(rect, style, name)
         self.widgets = widgets
         self.surface = pygame.Surface((self.rect.w, self.rect.h))
 
@@ -172,7 +201,7 @@ class Container(Widget):
         for w in self.widgets:
             w.handle_event(event)
 
-    def draw(self):
+    def draw(self, surf):
         for w in self.widgets:
             w.draw(self.surface)
 

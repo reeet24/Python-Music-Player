@@ -1,0 +1,77 @@
+{
+    "widgets": {
+        "download_button": {
+            "type": "button",
+            "text": "Download",
+            "fire_event": "download_button_pressed",
+            "rect": [548, 12, 120, 32]
+        },
+        "play_button": {
+            "type": "button",
+            "text": "Play",
+            "fire_event": "play_button_pressed",
+            "rect": [12, 60, 90, 32]
+        },
+        "pause_button": {
+            "type": "button",
+            "text": "Pause",
+            "fire_event": "pause_button_pressed",
+            "rect": [112, 60, 90, 32]
+        },
+        "resume_button": {
+            "type": "button",
+            "text": "Resume",
+            "fire_event": "resume_button_pressed",
+            "rect": [212, 60, 90, 32]
+        },
+        "skip_button": {
+            "type": "button",
+            "text": "Skip",
+            "fire_event": "skip_button_pressed",
+            "rect": [312, 60, 90, 32]
+        },
+        "volume_slider": {
+            "type": "slider",
+            "min_val": 0,
+            "max_val": 100,
+            "start_val": 50,
+            "fire_event": "volume_slider_changed",
+            "rect": [420, 60, 200, 32]
+        },
+        "save_button": {
+            "type": "button",
+            "text": "Save",
+            "fire_event": "save_button_pressed",
+            "rect": [548, 110, 110, 36]
+        },
+        "load_button": {
+            "type": "button",
+            "text": "Load",
+            "fire_event": "load_button_pressed",
+            "rect": [678, 110, 110, 36]
+        },
+        "now_playing_label": {
+            "type": "label",
+            "text": "Now: (Stopped)",
+            "rect": [12, 460, 500, 28]
+        },
+        "status_label": {
+            "type": "label",
+            "text": "Status: idle",
+            "rect": [12, 432, 780, 28]
+        },
+        "name_box": {
+            "type": "SearchBox",
+            "font": "Arial",
+            "font_size": 16,
+            "item_height": 24,
+            "rect": [548, 152, 240, 256]
+        },
+        "playlist": {
+            "type": "PlaylistWidget",
+            "font": "Arial",
+            "font_size": 18,
+            "rect": [12, 110, 520, 340]
+        }
+    }
+}

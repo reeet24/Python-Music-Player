@@ -41,5 +41,20 @@
       "font_size": 20,
       "search_box_color": [40, 40, 40]
     }
+  },
+  "PlaylistWidget": {
+    "default": {
+      "bg_color": [30,30,30], 
+      "fg_color": [220,220,220], 
+      "selected_bg": [80,120,180],
+      "font_size": 20,
+      "search_box_color": [40, 40, 40]
+    }
+  },
+  "ProgressBar": {
+    "default": {
+      "bg_color": [30, 30, 30],
+      "fg_color": [180, 180, 180]
+    }
   }
 }
