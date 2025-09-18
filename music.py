@@ -374,6 +374,10 @@ class SearchBoxWidget(Widget):
         y += self.item_height
 
         for i, (text, item) in enumerate(self.items.items()):
+
+            if not text.lower().startswith(self.query.lower()):
+                continue
+
             item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
             if i == self.selected:
                 pygame.draw.rect(surf, sel_bg, item_rect)
