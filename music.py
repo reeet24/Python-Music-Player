@@ -534,6 +534,7 @@ def main():
     progress_bar = ProgressBar(rect=(14, 420, 516, 10), style=safe_style_get(style_mgr, "ProgressBar"))
     ui.add(progress_bar)
 
+    # Assigning important widgets to variables
     for w in ui.widgets:
         try:
             if w.name == "status_label":
