@@ -479,7 +479,7 @@ class SearchBoxWidget(Widget):
         if self.active:
             self.cursor_timer = (self.cursor_timer + 1) % 60
             if self.cursor_timer < 30:
-                cursor_x = self.search_rect.x + 2 + txtsurf.get_width() + 2
+                cursor_x = self.search_rect.x + txtsurf.get_width() + 2
                 cursor_y = self.search_rect.y + 1
                 pygame.draw.line(surf, fg, (cursor_x, cursor_y), (cursor_x, cursor_y + txtsurf.get_height()), 2)
         y += self.item_height
