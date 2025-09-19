@@ -484,7 +484,7 @@ class SearchBoxWidget(Widget):
                 pygame.draw.line(surf, fg, (cursor_x, cursor_y), (cursor_x, cursor_y + txtsurf.get_height()), 2)
         y += self.item_height
 
-        visible = self.rect.h - self.item_height // self.item_height
+        visible = (self.rect.h // self.item_height) - 1
         range(self.scroll, min(len(self.items), self.scroll + visible))
 
         for i, (text, item) in enumerate(self.items.items()):
@@ -691,9 +691,11 @@ def main():
         if state:
             name_box.state = "default"
             name_box.set_items(get_playlists())
+            name_box.scroll = 0
         else:
             name_box.state = "song"
             name_box.set_items(get_songs())
+            name_box.scroll = 0
     
     def on_search(query: str, state: str):
         if state == "default":
