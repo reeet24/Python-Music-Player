@@ -117,7 +117,7 @@ class Label(Widget):
 
 
 class TextBox(Widget):
-    def __init__(self, rect, style, text="", name = "", border_radius = 0, font: Optional[str] = None, font_size: Optional[int] = None):
+    def __init__(self, rect, style, text="", name = "", border_radius = 0, font: Optional[str] = None, font_size: Optional[int] = None, default_text = None):
         super().__init__(rect, style, name)
         self.text = text
         self.font = pygame.font.SysFont(font or self.style.get("font", None), font_size or self.style.get("font_size", 24))
@@ -125,6 +125,7 @@ class TextBox(Widget):
         self.cursor_visible = True
         self.cursor_timer = 0
         self.border_radius = border_radius
+        self.default_text = default_text
         self.mod = {
             "shift": False,
             "ctrl": False,
@@ -183,7 +184,11 @@ class TextBox(Widget):
         pygame.draw.rect(surface, bg, self.rect, border_radius=self.border_radius)
         pygame.draw.rect(surface, (0, 0, 0), self.rect, 2 if self.active else 1, border_radius=self.border_radius)
 
-        text_surf = self.font.render(self.text, True, fg)
+        if self.text == "":
+            text = self.default_text or self.style.get("default_text", "")
+        else:
+            text = self.text
+        text_surf = self.font.render(text, True, fg)
         surface.blit(text_surf, (self.rect.x + 5, self.rect.y + 5))
 
         # blinking cursor

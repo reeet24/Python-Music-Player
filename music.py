@@ -83,6 +83,22 @@ def safe_style_get(sm, key, default=None):
 def sanitize_filename_for_display(path):
     return os.path.basename(path)
 
+def filename_has_youtube_id(filename):
+    #Returns True if the filename contains a valid youtube ID. Checks the extracted ID with requests.
+    id = get_youtube_id_from_filename(filename)
+    try:
+        requests.get(f"https://www.youtube.com/watch?v={id}")
+        return True
+    except Exception:
+        return False
+
+def strip_youtube_id_from_filename(filename: str):
+    #Splits the filename and returns the "title" which is the portion before the last " - " in the filename. If multiple " - " are present rejoin the non-id portion with " - "
+    return filename[:-16]
+
+def get_youtube_id_from_filename(filename):
+    return filename[-15:-4]
+
 def get_random_flavor_message():
     flavorFile = "config/flavor.json"
     with open(flavorFile, "r", encoding="utf-8") as f:
@@ -104,9 +120,21 @@ def load_song_metadata(title):
     with open(f'{METADATA_DIR}/{title}.json', 'r', encoding='utf-8') as f:
         return json.load(f)
     
+def check_for_metadata_file(mp3_path):
+    for metadata_file in os.listdir(METADATA_DIR):
+        if metadata_file.endswith(".json"):
+            metadata = load_song_metadata(metadata_file[:-5])
+            if metadata["path"] == mp3_path:
+                return metadata
+    return None
+    
 def _get_song_metadata(song_path, youtube_id=None):
-    title = os.path.basename(song_path)
+    title = os.path.basename(song_path).replace(".mp3", "")
     duration = None
+
+    if filename_has_youtube_id(os.path.basename(song_path)):
+        title = strip_youtube_id_from_filename(os.path.basename(song_path))
+        youtube_id = get_youtube_id_from_filename(os.path.basename(song_path))
 
     try:
         audio = MP3(song_path)
@@ -199,10 +227,12 @@ class MusicPlayer:
     def check_music_dir_for_new_songs(self):
         for song in os.listdir(MUSIC_DIR):
             song_path = os.path.join(MUSIC_DIR, song)
-            if not os.path.exists(f'{METADATA_DIR}/{song}.json'):
+
+            if song.endswith(".mp3") and not check_for_metadata_file(song_path):
                 metadata = _get_song_metadata(song_path)
                 save_song_metadata(metadata)
-                print(f"Found new song: {metadata['title']}")
+                self.playlist.append(metadata)
+                self.ui_queue.put(("song_added", metadata))
 
     def load_song(self, title):
         metadata = load_song_metadata(title)
@@ -333,7 +363,10 @@ class PlaylistWidget(Widget):
         x, y = self.rect.x + 4, self.rect.y + 4
         visible = self.rect.h // self.item_height
         for i in range(self.scroll, min(len(self.player.playlist), self.scroll + visible)): # type: ignore
-            entry = self.player.playlist[i] # type: ignore
+            try:
+                entry = self.player.playlist[i] # type: ignore
+            except IndexError:
+                break
             title = entry["title"]
             dur = entry.get("duration", 0)
             mins, secs = divmod(dur, 60)
@@ -399,7 +432,7 @@ class PlaylistWidget(Widget):
                         time.sleep(0.5)
                         self.debounce = False
                     threading.Thread(target=delayed).start()
-        elif event.type == pygame.MOUSEWHEEL:
+        elif event.type == pygame.MOUSEWHEEL and self.rect.collidepoint(pygame.mouse.get_pos()):
             if event.y > 0:
                 self.scroll = max(0, self.scroll - 1)
             elif event.y < 0:
@@ -417,6 +450,8 @@ class SearchBoxWidget(Widget):
         self.active = False
         self.search_rect = pygame.Rect(self.rect.x + 4, self.rect.y + 4, self.rect.w, item_height)
         self.search_event = search_event
+        self.scroll = 0
+        self.cursor_timer = 0
         self.mod = {
             "backspace": False
         }
@@ -440,7 +475,17 @@ class SearchBoxWidget(Widget):
         pygame.draw.rect(surf, tuple(self.style.get("search_box_color", (50, 50, 50))), self.search_rect)
         txtsurf = self.font.render(self.query or "Search", True, fg)
         surf.blit(txtsurf, (x, y))
+        # blinking cursor
+        if self.active:
+            self.cursor_timer = (self.cursor_timer + 1) % 60
+            if self.cursor_timer < 30:
+                cursor_x = self.search_rect.x + 2 + txtsurf.get_width() + 2
+                cursor_y = self.search_rect.y + 1
+                pygame.draw.line(surf, fg, (cursor_x, cursor_y), (cursor_x, cursor_y + txtsurf.get_height()), 2)
         y += self.item_height
+
+        visible = self.rect.h // self.item_height
+        range(self.scroll, min(len(self.items), self.scroll + visible))
 
         for i, (text, item) in enumerate(self.items.items()):
 
@@ -449,13 +494,14 @@ class SearchBoxWidget(Widget):
             
             self.visible_items[text] = item
 
-            item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
-            if i == self.selected:
-                pygame.draw.rect(surf, sel_bg, item_rect)
+            if len(self.visible_items) <= visible:
+                item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
+                if i == self.selected:
+                    pygame.draw.rect(surf, sel_bg, item_rect)
 
-            txtsurf = self.font.render(text, True, fg)
-            surf.blit(txtsurf, (x, y))
-            y += self.item_height
+                txtsurf = self.font.render(text, True, fg)
+                surf.blit(txtsurf, (x, y))
+                y += self.item_height
         surf.set_clip(clip)
         # border
         pygame.draw.rect(surf, (0,0,0), self.rect, 2)
@@ -513,6 +559,11 @@ class SearchBoxWidget(Widget):
             if 0 <= idx < len(self.visible_items) and self.rect.collidepoint(event.pos):
                 self.query = list(self.visible_items)[idx]
                 GlobalEventRegistry.dispatch(Event(self.search_event, {"query": self.query, "state": self.state}))
+        elif event.type == pygame.MOUSEWHEEL and self.rect.collidepoint(pygame.mouse.get_pos()):
+            if event.y > 0:
+                self.scroll = max(0, self.scroll - 1)
+            elif event.y < 0:
+                self.scroll = min(len(self.items) - self.rect.h // self.item_height, self.scroll + 1)
 
 class ProgressBar(Widget):
     def __init__(self, rect, style, name = ""):
@@ -581,7 +632,7 @@ UI_Loader.register_widget_type("PlaylistWidget", PlaylistWidget)
 def main():
     running = True
     screen = pygame.display.set_mode((800, 480))
-    pygame.display.set_caption("Pygame yt_dlp Music — Widget UI")
+    pygame.display.set_caption("Terrable Music Player")
     clock = pygame.time.Clock()
 
     # Load styles (optional)
@@ -669,6 +720,28 @@ def main():
                 # automatic skip when track ends
                 player.skip()
             else:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_BACKQUOTE:
+                        # Reload styles and UI
+                        UI_Loader.reload_scenes()
+                        ui = UI_Loader.load_scene("main")
+                        for w in ui.widgets:
+                            try:
+                                if w.name == "status_label":
+                                    status_label = w
+                                elif w.name == "now_playing_label":
+                                    now_label = w
+                                elif w.name == "name_box":
+                                    name_box = w
+                                elif w.name == "playlist":
+                                    playlist = w
+                                    playlist.set_player(player)
+                                elif w.name == "url_box":
+                                    url_box = w
+                                elif w.name == "progress_bar":
+                                    progress_bar = w
+                            except AttributeError:
+                                continue
                 # forward to UI manager and playlist widget
                 ui.handle_event(event)
                 playlist.handle_event(event)

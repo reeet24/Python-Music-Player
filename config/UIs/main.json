@@ -74,18 +74,19 @@
             "font": "Arial",
             "font_size": 16,
             "item_height": 24,
-            "rect": [548, 152, 240, 256],
+            "rect": [548, 152, 240, 298],
             "search_event": "playlist_selected"
         },
         "playlist": {
             "type": "PlaylistWidget",
             "font": "Arial",
             "font_size": 18,
-            "rect": [12, 110, 520, 340]
+            "rect": [12, 110, 530, 340]
         },
         "url_box": {
             "type": "textbox",
-            "rect": [12, 12, 520, 32]
+            "default_text": "Enter URL...",
+            "rect": [12, 12, 530, 32]
         },
         "progress_bar": {
             "type": "ProgressBar",
