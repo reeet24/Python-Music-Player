@@ -484,24 +484,28 @@ class SearchBoxWidget(Widget):
                 pygame.draw.line(surf, fg, (cursor_x, cursor_y), (cursor_x, cursor_y + txtsurf.get_height()), 2)
         y += self.item_height
 
-        visible = self.rect.h // self.item_height
+        visible = self.rect.h - self.item_height // self.item_height
         range(self.scroll, min(len(self.items), self.scroll + visible))
 
         for i, (text, item) in enumerate(self.items.items()):
 
-            if not text.lower().startswith(self.query.lower()):
+            if not self.query.lower() in text.lower():
                 continue
             
             self.visible_items[text] = item
 
-            if len(self.visible_items) <= visible:
-                item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
-                if i == self.selected:
-                    pygame.draw.rect(surf, sel_bg, item_rect)
+        for i in range(self.scroll, min(len(self.visible_items), self.scroll + visible)):
+            try:
+                text = list(self.visible_items.keys())[i]
+            except IndexError:
+                break
+            item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
+            if i == self.selected:
+                pygame.draw.rect(surf, sel_bg, item_rect)
 
-                txtsurf = self.font.render(text, True, fg)
-                surf.blit(txtsurf, (x, y))
-                y += self.item_height
+            txtsurf = self.font.render(text, True, fg)
+            surf.blit(txtsurf, (x, y))
+            y += self.item_height
         surf.set_clip(clip)
         # border
         pygame.draw.rect(surf, (0,0,0), self.rect, 2)
@@ -557,13 +561,14 @@ class SearchBoxWidget(Widget):
             local_y = event.pos[1] - self.rect.y
             idx = self.selected + (local_y // self.item_height)
             if 0 <= idx < len(self.visible_items) and self.rect.collidepoint(event.pos):
-                self.query = list(self.visible_items)[idx]
-                GlobalEventRegistry.dispatch(Event(self.search_event, {"query": self.query, "state": self.state}))
+                GlobalEventRegistry.dispatch(Event(self.search_event, {"query": list(self.visible_items)[idx + self.scroll], "state": self.state}))
         elif event.type == pygame.MOUSEWHEEL and self.rect.collidepoint(pygame.mouse.get_pos()):
+            if len(self.visible_items) <= (self.rect.h // self.item_height):
+                return
             if event.y > 0:
                 self.scroll = max(0, self.scroll - 1)
             elif event.y < 0:
-                self.scroll = min(len(self.items) - self.rect.h // self.item_height, self.scroll + 1)
+                self.scroll = min(len(self.visible_items) - ((self.rect.h // self.item_height) - 1), self.scroll + 1)
 
 class ProgressBar(Widget):
     def __init__(self, rect, style, name = ""):
