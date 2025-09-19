@@ -180,10 +180,12 @@ class MusicPlayer:
                 "preferredquality": "192",
             }],
             "quiet": False,
-            "noplaylist": True,
+            "noplaylist": False,
             "nopart": True,
             "geo_bypass": True,  # optional: bypass some region restrictions
             "cookies-from-browser": "chrome",
+            "no-abort-on-error": True,
+            "ignoreerrors": True
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl: # type: ignore
@@ -217,12 +219,13 @@ class MusicPlayer:
                     }
                     save_song_metadata(entry)
                     self.playlist.append(entry)
-                    self.ui_queue.put(("download_complete", entry))
+                    self.ui_queue.put(("download_complete", {"title": title}))
                 else:
-                    self.ui_queue.put(("download_failed", url, "file-not-found-after-download"))
+                    self.ui_queue.put(("download_failed", {"error": "file-not-found-after-download"}))
         except Exception as e:
             tb = traceback.format_exc()
-            self.ui_queue.put(("download_failed", url, str(e), tb))
+            self.ui_queue.put(("download_failed", {"error": str(e)}))
+        self.check_music_dir_for_new_songs()
 
     def check_music_dir_for_new_songs(self):
         for song in os.listdir(MUSIC_DIR):
@@ -232,13 +235,13 @@ class MusicPlayer:
                 metadata = _get_song_metadata(song_path)
                 save_song_metadata(metadata)
                 self.playlist.append(metadata)
-                self.ui_queue.put(("song_added", metadata))
+                self.ui_queue.put(("song_added", {"title": metadata["title"]}))
 
     def load_song(self, title):
         metadata = load_song_metadata(title)
         save_song_metadata(metadata)
         self.playlist.append(metadata)
-        self.ui_queue.put(("song_added", metadata))
+        self.ui_queue.put(("song_added", {"title": title}))
 
     def download_async(self, url):
         threading.Thread(target=self._download_worker, args=(url,), daemon=True).start()
@@ -257,7 +260,7 @@ class MusicPlayer:
             pygame.mixer.music.load(track["path"])
             pygame.mixer.music.play()
             self.current_title = track["title"]
-            self.ui_queue.put(("play_started", self.index, self.current_title))
+            self.ui_queue.put(("play_started", {"index": self.index + 1, "title": self.current_title}))
             if self.is_online:
                 RPCdata = {
                     "details": get_random_flavor_message(),
@@ -271,19 +274,19 @@ class MusicPlayer:
             self.is_playing = True
             self.is_stopped = False
         except Exception as e:
-            self.ui_queue.put(("play_error", str(e)))
+            self.ui_queue.put(("play_error", {"error": str(e)}))
 
     def pause(self):
         if self.is_playing:
             self.is_playing = False
             pygame.mixer.music.pause()
-            self.ui_queue.put(("paused", None))
+            self.ui_queue.put(("paused", {}))
 
     def resume(self):
         if not self.is_playing and not self.is_stopped:
             self.is_playing = True
             pygame.mixer.music.unpause()
-            self.ui_queue.put(("resumed", None))
+            self.ui_queue.put(("resumed", {}))
 
     def stop(self):
         global RPCdata
@@ -292,7 +295,7 @@ class MusicPlayer:
             self.is_stopped = True
             pygame.mixer.music.stop()
             RPCdata = RPCDefault
-            self.ui_queue.put(("stopped", None))
+            self.ui_queue.put(("stopped", {}))
 
     def skip(self):
         if not self.playlist:
@@ -305,23 +308,23 @@ class MusicPlayer:
     def set_volume(self, v):  # v in 0..1
         self.volume = max(0.0, min(1.0, v))
         pygame.mixer.music.set_volume(self.volume)
-        self.ui_queue.put(("volume", self.volume))
+        self.ui_queue.put(("volume", {"volume": int(self.volume*100)}))
 
     def save_playlist(self, name):
         if not name:
-            self.ui_queue.put(("save_failed", "empty-name"))
+            self.ui_queue.put(("save_failed", {"name": "empty-name"}))
             return
         path = os.path.join(PLAYLIST_DIR, f"{name}.json")
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(self.playlist, f, indent=2)
-            self.ui_queue.put(("save_ok", name))
+            self.ui_queue.put(("save_ok", {"name": name}))
         except Exception as e:
-            self.ui_queue.put(("save_failed", str(e)))
+            self.ui_queue.put(("save_failed", {"error": str(e)}))
 
     def load_playlist(self, name):
         if not name:
-            self.ui_queue.put(("load_failed", "empty-name"))
+            self.ui_queue.put(("load_failed", {"name": "empty-name"}))
             return
         path = os.path.join(PLAYLIST_DIR, f"{name}.json")
         try:
@@ -330,9 +333,9 @@ class MusicPlayer:
             # keep only files that exist
             self.playlist = [d for d in data if os.path.exists(d["path"])]
             self.index = 0
-            self.ui_queue.put(("load_ok", name, len(self.playlist)))
+            self.ui_queue.put(("load_ok", {"name": name, "count": len(self.playlist)}))
         except Exception as e:
-            self.ui_queue.put(("load_failed", str(e)))
+            self.ui_queue.put(("load_failed", {"error": str(e)}))
 
 
 class PlaylistWidget(Widget):
@@ -683,7 +686,7 @@ def main():
         urls = [u.strip() for u in urls_text.splitlines() if u.strip()]
         for url in urls:
             player.download_async(url)
-        ui_queue.put(("download_started", urls_text))
+        ui_queue.put(("download_started", {}))
         # clear input
         url_box.text = ""
 
@@ -754,59 +757,39 @@ def main():
                 playlist.handle_event(event)
 
         # Process messages from background threads
+
+        status_messages = {
+            "download_complete": "Downloaded: {title}",
+            "download_failed": "Download failed: {error}",
+            "download_started": "Downloading...",
+            "play_started": "Playing",
+            "play_error": "Error: {error}",
+            "paused": "Paused",
+            "resumed": "Resumed",
+            "save_ok": "Saved playlist as {name}",
+            "save_failed": "Failed to save playlist: {error}",
+            "load_ok": "Playlist loaded: {name} ({count} songs)",
+            "load_failed": "Failed to load playlist: {error}",
+            "volume_changed": "Volume changed: {volume}",
+            "song_added": "Added {title} to queue",
+        }
+
+        now_text = "Now: {index}: {title}"
+
         try:
             while True:
                 msg = ui_queue.get_nowait()
                 if not msg:
                     continue
                 tag = msg[0]
-                if tag == "download_complete":
-                    _, down_entry = msg
-                    title = down_entry["title"]
-                    status_text = f"Downloaded: {title}"
-                    # refresh playlist widget (it uses player.playlist directly)
-                    if hasattr(now_label, "set_text"):
-                        now_label.set_text(f"Now: {player.current_title or '(stopped)'}")
-                    else:
-                        now_label.text = f"Now: {player.current_title or '(stopped)'}"
-                    status_label.set_text(status_text) if hasattr(status_label, "set_text") else setattr(status_label, "text", status_text)
-                elif tag == "download_failed":
-                    _, url, error, *rest = msg
-                    status_label.set_text(f"Download failed: {error}") if hasattr(status_label, "set_text") else setattr(status_label, "text", f"Download failed: {error}")
-                elif tag == "download_started":
-                    _, url = msg
-                    status_label.set_text(f"Downloading...") if hasattr(status_label, "set_text") else setattr(status_label, "text", "Downloading...")
-                elif tag == "play_started":
-                    _, idx, title = msg
-                    if hasattr(now_label, "set_text"):
-                        now_label.set_text(f"Now: {title}")
-                    else:
-                        now_label.text = f"Now: {title}"
-                    status_label.set_text("Playing") if hasattr(status_label, "set_text") else setattr(status_label, "text", "Playing")
-                elif tag == "play_error":
-                    _, err = msg
-                    status_label.set_text(f"Play error: {err}") if hasattr(status_label, "set_text") else setattr(status_label, "text", f"Play error: {err}")
-                elif tag == "paused":
-                    status_label.set_text("Paused") if hasattr(status_label, "set_text") else setattr(status_label, "text", "Paused")
-                elif tag == "resumed":
-                    status_label.set_text("Resumed") if hasattr(status_label, "set_text") else setattr(status_label, "text", "Resumed")
-                elif tag == "save_ok":
-                    _, name = msg
-                    status_label.set_text(f"Saved playlist: {name}") if hasattr(status_label, "set_text") else setattr(status_label, "text", f"Saved playlist: {name}")
-                elif tag == "save_failed":
-                    _, reason = msg
-                    status_label.set_text(f"Save failed: {reason}") if hasattr(status_label, "set_text") else setattr(status_label, "text", f"Save failed: {reason}")
-                elif tag == "load_ok":
-                    _, name, count = msg
-                    status_label.set_text(f"Loaded {count} entries from {name}") if hasattr(status_label, "set_text") else setattr(status_label, "text", f"Loaded {count} entries from {name}")
-                elif tag == "load_failed":
-                    _, reason = msg
-                    status_label.set_text(f"Load failed: {reason}") if hasattr(status_label, "set_text") else setattr(status_label, "text", f"Load failed: {reason}")
-                elif tag == "volume":
-                    _, vol = msg
-                    status_label.set_text(f"Volume: {int(vol*100)}%") if hasattr(status_label, "set_text") else setattr(status_label, "text", f"Volume: {int(vol*100)}%")
+                if tag == "play_started":
+                    _, data = msg
+                    now_label.text = now_text.format(**data)  
+                    status_label.text = "Playing"
+                elif tag in list(status_messages.keys()):
+                    _, data = msg
+                    status_label.text = status_messages[tag].format(**data)
                 else:
-                    # unknown message
                     pass
         except queue.Empty:
             pass
