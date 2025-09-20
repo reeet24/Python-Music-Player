@@ -16,6 +16,9 @@ class StyleManager:
     def get_style(self, widget_type, state="default"):
         return self.styles.get(widget_type, {}).get(state, {})
     
+    def add_style(self, style_dict: dict, style_name: str):
+        self.styles[style_name] = style_dict
+    
 class Event:
     def __init__(self, type, data = {}):
         self.type = type
@@ -179,6 +182,8 @@ class TextBox(Widget):
                 self.mod["backspace"] = False
 
     def draw(self, surface):
+        clip = surface.get_clip()
+        surface.set_clip(self.rect)
         bg = self.style.get("bg_color", (255, 255, 255))
         fg = self.style.get("fg_color", (0, 0, 0))
         pygame.draw.rect(surface, bg, self.rect, border_radius=self.border_radius)
@@ -189,13 +194,24 @@ class TextBox(Widget):
         else:
             text = self.text
         text_surf = self.font.render(text, True, fg)
-        surface.blit(text_surf, (self.rect.x + 5, self.rect.y + 5))
+        tw, th = text_surf.get_size()
+        #surface.blit(text_surf, (self.rect.x + 5, self.rect.y + 5))
+        #Draw the text from the left side of the box and shifts it to the left if the text is too long
+        if tw > self.rect.w - 10:
+            offset = (self.rect.w - 10) - tw
+        else:
+            offset = 0
+        surface.blit(text_surf, (self.rect.x + 5 + offset, self.rect.y + 5))
+        surface.set_clip(clip)
 
         # blinking cursor
         if self.active:
             self.cursor_timer = (self.cursor_timer + 1) % 60
             if self.cursor_timer < 30:
-                cursor_x = self.rect.x + 5 + text_surf.get_width() + 2
+                if offset < 0:
+                    cursor_x = self.rect.x + (self.rect.w - 5)
+                else:
+                    cursor_x = self.rect.x + 5 + text_surf.get_width() + 2
                 cursor_y = self.rect.y + 5
                 pygame.draw.line(surface, fg, (cursor_x, cursor_y), (cursor_x, cursor_y + text_surf.get_height()), 2)
 
@@ -263,6 +279,36 @@ class UIManager:
         for w in self.widgets:
             w.draw(surface)
 
+style_override = {
+    "custom": {
+        # Creates a custom button style
+        "name": "save_button",
+        "state_1": {
+            "bg_color": (0, 0, 0),
+            "fg_color": (255, 255, 255)
+        },
+        "state_2": {
+            "bg_color": (255, 255, 255),
+            "fg_color": (0, 0, 0)
+        },
+        "state_3": {
+            "bg_color": (255, 0, 0),
+            "fg_color": (0, 0, 0)
+        }
+    },
+    "defined": {
+        # Also creates a custom button style but copies and modifies the default button style
+        "name": "save_button",
+        "type": "button",
+        "states": {
+            "default": {
+                "bg_color": (200, 200, 200),
+                "fg_color": (0, 0, 0)
+            }
+        }
+    }
+}
+
 class JSONUILoader:
     def __init__(self, scene_folder: pathlib.Path | str, style_file: str = "style.json"):
         if isinstance(scene_folder, str):
@@ -299,6 +345,26 @@ class JSONUILoader:
         """
         self.widget_types[widget_type] = widget_class
 
+    def _handle_style_override(self, override_dict: dict):
+        # Either makes a custom style or loads and modifies an existing style
+        name = ""
+        if "custom" in override_dict:
+            name = override_dict["custom"]["name"]
+            override_dict["custom"].pop("name")
+            self.style_mgr.add_style(override_dict["custom"], name)
+        elif "defined" in override_dict:
+            # First gets the original style, including all states
+            name = override_dict["defined"]["name"]
+            original_style = self.style_mgr.styles.get(override_dict["defined"]["type"], {})
+
+            # Then applies the modifications
+            for state, modifications in override_dict["defined"].get("states", {}).items():
+                original_style[state].update(modifications)
+
+            self.style_mgr.add_style(original_style, override_dict["defined"]["name"])
+        
+        return name
+
     def _scene_to_ui(self, scene: dict):
         """
         Loads a UI from a JSON scene definition.
@@ -314,6 +380,15 @@ class JSONUILoader:
             widget_class = self.widget_types[widget["type"]]
             args = widget
             args["name"] = key
+
+            if "style_override" in widget:
+                name = self._handle_style_override(widget["style_override"])
+                args["style"] = self.style_mgr.get_style(name, widget.get("state", "default"))
+                args.pop("style_override")
+                args.pop("type")
+                ui.add(widget_class(**args))
+                continue
+
             args["style"] = self.style_mgr.get_style(widget["type"], widget.get("state", "default"))
             args.pop("type")
             ui.add(widget_class(**args))

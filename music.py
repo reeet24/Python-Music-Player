@@ -183,7 +183,7 @@ class MusicPlayer:
             "noplaylist": False,
             "nopart": True,
             "geo_bypass": True,  # optional: bypass some region restrictions
-            "cookies-from-browser": "chrome",
+            "cookies": "cookies.txt",
             "no-abort-on-error": True,
             "ignoreerrors": True
         }
@@ -355,14 +355,14 @@ class PlaylistWidget(Widget):
     def set_player(self, player: MusicPlayer):
         self.player = player
 
-    def draw(self, surf):
+    def draw(self, surface):
         bg = tuple(self.style.get("bg_color", (30, 30, 30)))
         fg = tuple(self.style.get("fg_color", (230, 230, 230)))
         sel_bg = tuple(self.style.get("selected_bg", (80, 80, 120)))
-        pygame.draw.rect(surf, bg, self.rect)
+        pygame.draw.rect(surface, bg, self.rect)
         # clip drawing to widget rect
-        clip = surf.get_clip()
-        surf.set_clip(self.rect)
+        clip = surface.get_clip()
+        surface.set_clip(self.rect)
         x, y = self.rect.x + 4, self.rect.y + 4
         visible = self.rect.h // self.item_height
         for i in range(self.scroll, min(len(self.player.playlist), self.scroll + visible)): # type: ignore
@@ -377,14 +377,14 @@ class PlaylistWidget(Widget):
 
             item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
             if i == self.player.index: # type: ignore
-                pygame.draw.rect(surf, sel_bg, item_rect)
+                pygame.draw.rect(surface, sel_bg, item_rect)
 
             txtsurf = self.font.render(text, True, fg)
-            surf.blit(txtsurf, (x, y))
+            surface.blit(txtsurf, (x, y))
             y += self.item_height
-        surf.set_clip(clip)
+        surface.set_clip(clip)
         # border
-        pygame.draw.rect(surf, (0,0,0), self.rect, 2)
+        pygame.draw.rect(surface, (0,0,0), self.rect, 2)
 
     def handle_event(self, event):
 
@@ -419,10 +419,15 @@ class PlaylistWidget(Widget):
                     if self.debounce:
                         return
                     
+                    def delayed():
+                        time.sleep(0.5)
+                        self.debounce = False
+                        
                     self.debounce = True
 
                     if self.shift_down:
                         self.player.playlist.pop(idx) # type: ignore
+                        threading.Thread(target=delayed).start()
                         return
                     
                     if platform.system() == "Windows":
@@ -431,9 +436,7 @@ class PlaylistWidget(Widget):
                         subprocess.Popen(["xdg-open", os.path.dirname(entry["path"])])
                     
                     # Spawn a thread to avoid blocking
-                    def delayed():
-                        time.sleep(0.5)
-                        self.debounce = False
+                    
                     threading.Thread(target=delayed).start()
         elif event.type == pygame.MOUSEWHEEL and self.rect.collidepoint(pygame.mouse.get_pos()):
             if event.y > 0:
@@ -462,29 +465,29 @@ class SearchBoxWidget(Widget):
     def set_items(self, items: dict[str, Any]):
         self.items = items
 
-    def draw(self, surf):
+    def draw(self, surface):
         self.visible_items = {}
         # Draw first item as search box, then draw all other items
         bg = tuple(self.style.get("bg_color", (30, 30, 30)))
         fg = tuple(self.style.get("fg_color", (230, 230, 230)))
         sel_bg = tuple(self.style.get("selected_bg", (80, 80, 120)))
-        pygame.draw.rect(surf, bg, self.rect)
+        pygame.draw.rect(surface, bg, self.rect)
         # clip drawing to widget rect
-        clip = surf.get_clip()
-        surf.set_clip(self.rect)
+        clip = surface.get_clip()
+        surface.set_clip(self.rect)
         x, y = self.rect.x + 4, self.rect.y + 4
 
         # search box
-        pygame.draw.rect(surf, tuple(self.style.get("search_box_color", (50, 50, 50))), self.search_rect)
+        pygame.draw.rect(surface, tuple(self.style.get("search_box_color", (50, 50, 50))), self.search_rect)
         txtsurf = self.font.render(self.query or "Search", True, fg)
-        surf.blit(txtsurf, (x, y))
+        surface.blit(txtsurf, (x, y))
         # blinking cursor
         if self.active:
             self.cursor_timer = (self.cursor_timer + 1) % 60
             if self.cursor_timer < 30:
                 cursor_x = self.search_rect.x + txtsurf.get_width() + 2
                 cursor_y = self.search_rect.y + 1
-                pygame.draw.line(surf, fg, (cursor_x, cursor_y), (cursor_x, cursor_y + txtsurf.get_height()), 2)
+                pygame.draw.line(surface, fg, (cursor_x, cursor_y), (cursor_x, cursor_y + txtsurf.get_height()), 2)
         y += self.item_height
 
         visible = (self.rect.h // self.item_height) - 1
@@ -504,14 +507,14 @@ class SearchBoxWidget(Widget):
                 break
             item_rect = pygame.Rect(self.rect.x, y, self.rect.w, self.item_height)
             if i == self.selected:
-                pygame.draw.rect(surf, sel_bg, item_rect)
+                pygame.draw.rect(surface, sel_bg, item_rect)
 
             txtsurf = self.font.render(text, True, fg)
-            surf.blit(txtsurf, (x, y))
+            surface.blit(txtsurf, (x, y))
             y += self.item_height
-        surf.set_clip(clip)
+        surface.set_clip(clip)
         # border
-        pygame.draw.rect(surf, (0,0,0), self.rect, 2)
+        pygame.draw.rect(surface, (0,0,0), self.rect, 2)
 
     def _backspace_helper(self):
         def backspace():
@@ -550,6 +553,7 @@ class SearchBoxWidget(Widget):
                 self.selected = (self.selected - 1) % len(self.items)
             else:
                 self.query += event.unicode
+                self.scroll = 0
         elif event.type == pygame.KEYUP:
             if event.key == pygame.K_BACKSPACE:
                 self.mod["backspace"] = False
@@ -579,17 +583,17 @@ class ProgressBar(Widget):
         self.progress = 0.0 # 0-100
         self.enabled = True
     
-    def draw(self, surf):
+    def draw(self, surface):
         if not self.enabled:
             return
         bg = tuple(self.style.get("bg_color", (30, 30, 30)))
         fg = tuple(self.style.get("fg_color", (230, 230, 230)))
         progress = self.progress / 100
-        pygame.draw.rect(surf, bg, self.rect)
-        pygame.draw.rect(surf, fg, (self.rect.x, self.rect.y, self.rect.w * progress, self.rect.h))
+        pygame.draw.rect(surface, bg, self.rect)
+        pygame.draw.rect(surface, fg, (self.rect.x, self.rect.y, self.rect.w * progress, self.rect.h))
     
         # border
-        pygame.draw.rect(surf, (0,0,0), self.rect, 2)
+        pygame.draw.rect(surface, (0,0,0), self.rect, 2)
 
 # A class to manage online actions and allow for offline use.
 class OnlineManager:
@@ -674,6 +678,8 @@ def main():
                 url_box = w
             elif w.name == "progress_bar":
                 progress_bar = w
+            elif w.name == "pause_button":
+                pause_button = w
         except AttributeError:
             continue
 
@@ -706,12 +712,19 @@ def main():
         elif state == "song":
             player.load_song(query)
 
+    def on_pause_toggle():
+        if not player.is_playing and not player.is_stopped:
+            pause_button.text = "Pause"
+            player.resume()
+        elif player.is_playing:
+            pause_button.text = "Resume"
+            player.pause()
+
     GlobalEventRegistry.register("playlist_selected", callback=on_search)
 
     GlobalEventRegistry.register("download_button_pressed", on_download)
     GlobalEventRegistry.register("play_button_pressed", callback=(lambda: player.play()))
-    GlobalEventRegistry.register("pause_button_pressed", callback=(lambda: player.pause()))
-    GlobalEventRegistry.register("resume_button_pressed", callback=(lambda: player.resume()))
+    GlobalEventRegistry.register("pause_button_pressed", callback=(lambda: on_pause_toggle()))
     GlobalEventRegistry.register("skip_button_pressed", callback=(lambda: player.skip()))
     GlobalEventRegistry.register("playlist_button_pressed", callback=(lambda: name_box_state_change()))
     GlobalEventRegistry.register("song_button_pressed", callback=(lambda: name_box_state_change(False)))
@@ -750,6 +763,8 @@ def main():
                                     url_box = w
                                 elif w.name == "progress_bar":
                                     progress_bar = w
+                                elif w.name == "pause_button":
+                                    pause_button = w
                             except AttributeError:
                                 continue
                 # forward to UI manager and playlist widget
