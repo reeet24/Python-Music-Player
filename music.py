@@ -660,32 +660,13 @@ def main():
     online_manager = OnlineManager()
     online_manager.init_connection_loop()
     playlists = get_playlists()
-
-    # Assigning important widgets to variables
-    for w in ui.widgets:
-        try:
-            if w.name == "status_label":
-                status_label = w
-            elif w.name == "now_playing_label":
-                now_label = w
-            elif w.name == "name_box":
-                name_box = w
-                name_box.set_items(playlists)
-            elif w.name == "playlist":
-                playlist = w
-                playlist.set_player(player)
-            elif w.name == "url_box":
-                url_box = w
-            elif w.name == "progress_bar":
-                progress_bar = w
-            elif w.name == "pause_button":
-                pause_button = w
-        except AttributeError:
-            continue
+        
+    ui.named_widgets["playlist"].set_player(player)
+    ui.named_widgets["name_box"].set_items(playlists)
 
     # Helper functions for UI events
     def on_download():
-        urls_text = getattr(url_box, "text", "").strip()
+        urls_text = getattr(ui.named_widgets["url_box"], "text", "").strip()
         if not urls_text:
             return
         # split by newline to allow pasting multiple links at once
@@ -694,17 +675,17 @@ def main():
             player.download_async(url)
         ui_queue.put(("download_started", {}))
         # clear input
-        url_box.text = ""
+        ui.named_widgets["url_box"].text = ""
 
     def name_box_state_change(state: bool = True):
         if state:
-            name_box.state = "default"
-            name_box.set_items(get_playlists())
-            name_box.scroll = 0
+            ui.named_widgets["name_box"].state = "default"
+            ui.named_widgets["name_box"].set_items(get_playlists())
+            ui.named_widgets["name_box"].scroll = 0
         else:
-            name_box.state = "song"
-            name_box.set_items(get_songs())
-            name_box.scroll = 0
+            ui.named_widgets["name_box"].state = "song"
+            ui.named_widgets["name_box"].set_items(get_songs())
+            ui.named_widgets["name_box"].scroll = 0
     
     def on_search(query: str, state: str):
         if state == "default":
@@ -714,10 +695,10 @@ def main():
 
     def on_pause_toggle():
         if not player.is_playing and not player.is_stopped:
-            pause_button.text = "Pause"
+            ui.named_widgets["pause_button"].text = "Pause"
             player.resume()
         elif player.is_playing:
-            pause_button.text = "Resume"
+            ui.named_widgets["pause_button"].text = "Resume"
             player.pause()
 
     GlobalEventRegistry.register("playlist_selected", callback=on_search)
@@ -748,28 +729,11 @@ def main():
                         # Reload styles and UI
                         UI_Loader.reload_scenes()
                         ui = UI_Loader.load_scene("main")
-                        for w in ui.widgets:
-                            try:
-                                if w.name == "status_label":
-                                    status_label = w
-                                elif w.name == "now_playing_label":
-                                    now_label = w
-                                elif w.name == "name_box":
-                                    name_box = w
-                                elif w.name == "playlist":
-                                    playlist = w
-                                    playlist.set_player(player)
-                                elif w.name == "url_box":
-                                    url_box = w
-                                elif w.name == "progress_bar":
-                                    progress_bar = w
-                                elif w.name == "pause_button":
-                                    pause_button = w
-                            except AttributeError:
-                                continue
+                        ui.named_widgets["playlist"].set_player(player)
+                        ui.named_widgets["name_box"].set_items(playlists)
                 # forward to UI manager and playlist widget
                 ui.handle_event(event)
-                playlist.handle_event(event)
+                ui.named_widgets["playlist"].handle_event(event)
 
         # Process messages from background threads
 
@@ -799,11 +763,11 @@ def main():
                 tag = msg[0]
                 if tag == "play_started":
                     _, data = msg
-                    now_label.text = now_text.format(**data)  
-                    status_label.text = "Playing"
+                    ui.named_widgets["now_playing_label"].text = now_text.format(**data)  
+                    ui.named_widgets["status_label"].text = "Playing"
                 elif tag in list(status_messages.keys()):
                     _, data = msg
-                    status_label.text = status_messages[tag].format(**data)
+                    ui.named_widgets["status_label"].text = status_messages[tag].format(**data)
                 else:
                     pass
         except queue.Empty:
@@ -812,19 +776,19 @@ def main():
         # draw
         screen.fill((40, 40, 40))
         ui.draw(screen)
-        playlist.draw(screen)
+        ui.named_widgets["playlist"].draw(screen)
 
         # Draw progress bar
         if player.playlist and player.index < len(player.playlist):
             entry = player.playlist[player.index]
             dur = entry.get("duration", 0)
             if dur > 0:
-                progress_bar.enabled = True
+                ui.named_widgets["progress_bar"].enabled = True
                 elapsed = pygame.mixer.music.get_pos() // 1000
                 ratio = min(1.0, elapsed / dur) * 100
-                progress_bar.progress = ratio
+                ui.named_widgets["progress_bar"].progress = ratio
             else:
-                progress_bar.enabled = False
+                ui.named_widgets["progress_bar"].enabled = False
                 
         pygame.display.flip()
         clock.tick(60)

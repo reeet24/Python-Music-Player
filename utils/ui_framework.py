@@ -157,7 +157,7 @@ class TextBox(Widget):
                 # Paste from clipboard
                 try:
                     clip = pyclip.paste(text=True)
-                    if clip:
+                    if clip and isinstance(clip, str):
                         raw_text = clip
                         self.text += raw_text
                 except Exception:
@@ -260,16 +260,19 @@ class Container(Widget):
         for w in self.widgets:
             w.handle_event(event)
 
-    def draw(self, surf):
+    def draw(self, surface):
         for w in self.widgets:
             w.draw(self.surface)
 
 class UIManager:
     def __init__(self):
         self.widgets = []
+        self.named_widgets = {}
 
     def add(self, widget):
         self.widgets.append(widget)
+        if widget.name:
+            self.named_widgets[widget.name] = self.widgets[-1]
 
     def handle_event(self, event):
         for w in self.widgets:
