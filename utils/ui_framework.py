@@ -7,6 +7,7 @@ import re
 import time
 import threading
 import pathlib
+import pyclip
 
 class StyleManager:
     def __init__(self, style_file):
@@ -155,11 +156,10 @@ class TextBox(Widget):
             if self.mod["ctrl"] and event.key == pygame.K_v:
                 # Paste from clipboard
                 try:
-                    clip = pygame.scrap.get(pygame.SCRAP_TEXT)
+                    clip = pyclip.paste(text=True)
                     if clip:
-                        raw_text = clip.decode("utf-8")
-                        clean_text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f]', '', raw_text)
-                        self.text += clean_text
+                        raw_text = clip
+                        self.text += raw_text
                 except Exception:
                     pass
             elif event.key == pygame.K_BACKSPACE:
