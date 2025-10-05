@@ -12,7 +12,7 @@ Discord Rich Presence integration, and a custom Pygame UI.
 Make sure you have Python 3.9+ installed. Then run:
 
 ``` bash
-pip install yt-dlp pygame mutagen pypresence
+pip install yt-dlp pygame mutagen pypresence requests pyclip
 ```
 
 You also need **ffmpeg** installed and available in your system PATH.
@@ -25,6 +25,9 @@ You also need **ffmpeg** installed and available in your system PATH.
     │── music/               # Downloaded music files
     │── playlists/           # Saved playlists (.json)
     │── config/
+         ├── UIs
+            └── main.json    # UI Layout config
+         ├── settings.json   # General Settings
     │    ├── styles.json     # UI styling config
     │    ├── flavor.json     # Random flavor messages
     │── resources/

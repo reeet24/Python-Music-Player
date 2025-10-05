@@ -3,3 +3,4 @@ pygame
 mutagen
 pypresence
 requests
+pyclip

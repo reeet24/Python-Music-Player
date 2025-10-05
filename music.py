@@ -439,10 +439,12 @@ class PlaylistWidget(Widget):
                     
                     threading.Thread(target=delayed).start()
         elif event.type == pygame.MOUSEWHEEL and self.rect.collidepoint(pygame.mouse.get_pos()):
+            if len(self.player.playlist) <= self.rect.h // self.item_height: # type: ignore
+                return
             if event.y > 0:
                 self.scroll = max(0, self.scroll - 1)
             elif event.y < 0:
-                self.scroll = min(len(self.player.playlist) - self.rect.h // self.item_height, self.scroll + 1) # type: ignore
+                self.scroll = min(len(self.player.playlist) - (self.rect.h // self.item_height), self.scroll + 1) # type: ignore
 
 class SearchBoxWidget(Widget):
     def __init__(self, rect, style, font, font_size, item_height: int, items: dict[str, Any] = {}, name = "", search_event = ""):
@@ -701,6 +703,12 @@ def main():
             ui.named_widgets["pause_button"].text = "Resume"
             player.pause()
 
+    def on_shuffle():
+        if player.playlist:
+            random.shuffle(player.playlist)
+            player.index = 0
+            player.play()
+
     GlobalEventRegistry.register("playlist_selected", callback=on_search)
 
     GlobalEventRegistry.register("download_button_pressed", on_download)
@@ -711,6 +719,8 @@ def main():
     GlobalEventRegistry.register("song_button_pressed", callback=(lambda: name_box_state_change(False)))
 
     GlobalEventRegistry.register("volume_slider_changed", callback=(lambda value: player.set_volume(value/100)))
+
+    GlobalEventRegistry.register("shuffle_button_pressed", callback=on_shuffle)
     
     # UI loop
     
