@@ -1,4 +1,4 @@
-# Terra's Music Player
+# Terra's Terrable Music Player
 
 A lightweight, Python-based music player with YouTube download support,
 Discord Rich Presence integration, and a custom Pygame UI.
